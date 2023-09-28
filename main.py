@@ -13,7 +13,7 @@ class Generator(Resource):
     def get(self):
         return data, 200
 
-api.add_resource(Generator, '/Generator')
+api.add_resource(Generator, '/')
 
 if __name__ == '__main__':
     app.run()
