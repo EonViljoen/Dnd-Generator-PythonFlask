@@ -1,5 +1,5 @@
 {
-  "Dungeon": [
+  "Dungeon": 
       {
         "Puzzles" : [
         "A ring of disk-shaped stones (number of stones is equal to party members). Each party member must interact with a different stone in some way (stand on it, put something on it, etc.) to open the secret cache in the middle.",
@@ -27,9 +27,7 @@
         "Inscribed door something to the effect of \"you will need strength to take me down.\" Appears to be a normal door but when trying to push or pull the door open it is impossible to move. You can give strength checks to throw them off and make it seem like they are too weak. Solution: the door doesn't swing in or out, it raises up and down from the floor. Investigation to find out. Simple strength to actually push it down.",
         "A stone door with a hole about the size of a pen. 20ft. away, there is another stone stuck in the ground with its own pen sized hole. When light shines through both holes, the door opens (normally it happens at a certain time of a certain day of the year, but it can be replicated artificially).",
         "Two concentric circles inscribed in the ground. The donut is divided into 8 equal regions (imagine straight lines crossing the big circle and being covered by the small one). A pile of stones lies nearby. If a stone is placed on a region, another one lights up. Stones resist being placed on lit segments. The goal is to get 3 stones consecutively side by side before the same happens with the lit up regions (Tic-Tac-Toe on a circular board basically)."
-      ]
-    },
-    {
+      ],
       "Hidden Doors" : [
         "The entrance is a cobblestone wall that has a stone shaped like an anvil. To open, strike the anvil-shaped stone with a hammer.",
         "A large empty treasure chest lies on the floor. Its inside is carved with the thieves symbol for \"Escape\", but it is missing a single stroke. Scratching the final line in causes an audible unlocking click and the false bottom to fall open. Scratch lines disappear if the chest is closed.",
@@ -81,9 +79,7 @@
         "Some number of chairs (3, if you want Easy mode) sit in a circle in a room. They all look different, but in slightly varying ways. Sit in the right one, and the hidden passage opens; but there is a Wrong Chair (or \"Punishment Chair\") that either opens up a passage to enemies, or initiates a trap.",
         "The entrance is clearly visible ... 100 feet up a smooth stone wall. The only way to reach it is to plant and then water a magic beanstalk. [Or fly.]",
         "A teleportation circle under a rug"
-      ]
-    },
-    {
+      ],
       "Deadly Traps" : [
         "A pit trap opens up beneath a character. At the bottom of the bit they are falling into is a button that drops a stone block on top of them, covering the hole and smashing the character.",
         "A lever with a sign that says \"Pull to open\" next to a locked door with an extremely poorly hid trap door right under the entrance. Pulling the lever surprisingly opens the door. If you touch the door without pulling the lever, the trap door opens.",
@@ -143,9 +139,7 @@
         "A ceiling trapdoor opens letting out a swarm of poisonous snakes as well as a giant poisonous snake.",
         "Three chests sit in a room. A sign on the wall reads \"DANGER! MIMIC!\" There is no mimic, but there is a rug of smothering under each chest.",
         "An animated armor using a flying sword. After the armor is defeated, the sword begins to fight."
-      ]
-    },
-    {
+      ],
       "Cavern Curiosities" : [
         "A Stalagmite covered in bent pennies. It looks like passers by have jammed the edges of pennies and other small coins into the cracks and irregularities and bent them down to create an almost scale-effect. Over the years more calcium has been deposited on the pennies, trapping them within. New pennies were jammed between other calcified pennies, and so on, growing the stalagmite over time.",
         "The path here has been replaced with smooth stone squares alternating with squares of polished marble and rough stone in a checkerboard pattern. The whole pattern is irregular at the edges, longer but thinner than a true checkerboard.",
@@ -247,9 +241,7 @@
         "The cavern walls have fossil imprints regularly. Among the fossils you may find; a giant dragonfly wing, 10 feet long. A series of tiny hand bones. The complete skeleton of a large lizard like creature with huge horns. Several hard-shelled beetles, a up to a foot in size. The ?bones? of a porcelain mechanical doll, with a mask in the place of the head. One stone crack is filled with spiraling ridged shell fossils.",
         "The path opens up into a carved out grotto where several gigantic metal rings support celestial sculptures. The Sun and Moon are represented by colorful and bright spheres carved to resemble the faces of two women. Other planets and important stars have their own rings. It appears that the rings move in time with the celestial bodies, accurately depicting their position from the perspective of someone at the center of the sculpture.",
         "The tunnel slopes downward before ending in a hole, about 10 feet across. Several sturdy metal hooks are in place and at least one already has a rope attached, though the durability of the old rope is questionable. Peering through the hole, you can see the roof of a sizeable castle, with towers reaching up to just under the hole, it would be risky to jump, but plausible. Through other holes in this cavern ceiling waterfalls pour into the castle. The sturdy stonework of the castle has resulted in flooding from the waterfalls. Each room holds a few inches to several feet of water. One windowless tower door was so well made that the full tower was flooded, and now water cascades from the top down the stonework and into the courtyard. Water cascades down the grand staircase to the entrance. The courtyard, surrounded by a low circular wall, is now an algae filled pond, full of cave fish. Outside this castle pond, overflow rivers converge and continue on into the cave."
-      ]
-    },
-    {
+      ],
       "Riddles" : [
         "It has a golden head. It has a golden tail. It has no body. Answer: A gold coin.",
         "It wears a leather coat to keep its skins in working order. Escorts you to other realms, without a magic portal. Answer: Book.",
@@ -351,9 +343,7 @@
         "When one does not know what it is, then it is something. When one knows what it is, then it is nothing. Answer: A riddle.",
         "It is the beginning of eternity, the end of time and space, the beginning of the end and the end of every space. What is it? Answer: The letter E",
         "What tastes better than it smells? Answer: A tongue."
-      ]
-    },
-    {
+      ],
       "Treasure Defenses": [
         "Guarded by shrieking fungus",
         "Guarded by yapping dog",
@@ -455,9 +445,7 @@
         "Protected by curses or a legendary curse",
         "Protected by magical fear sigil",
         "Protected by death wards"
-      ]
-    },
-    {
+      ],
       "Tricky Traps" : [
         "Two bronze heads with open mouths, a deer and a wolf, with a door between them. To unlock the door you must put some meat in the wolf's mouth and some vegetable matter in the deer's mouth. Putting anything else in will cause the heads to howl and shriek, attracting a wandering monster.",
         "Floor covered in piles of hibernating murderferrets. Loud noises and being stepped on will awaken and enrage them. Murderferrets will prefer to attack things which other murderferrets have already latched on to. Tread carefully.",
@@ -560,8 +548,7 @@
         "Nothing can truly die in the dungeon, only dismembered and smushed. At the bottom of the dungeon, down the drains and the pipes and the tunnels, waits a veritable god of gestalt gore. Leaving the dungeon causes fatal wounds to take their final effect.",
         "Radiant beam fired from crystal lens heals damage but also causes mutations."
       ]
-    }
-  ],
+    },
   "Encounters": [
     [
       "Aerial Encounters",

@@ -16,7 +16,7 @@ class JsonReader():
             if (innerSection is None):
                 return data[section]
             else:
-                return data[section][innerSection]
+                return data[section].get(innerSection)
 
 # class Generator(Resource):
 #     def get(self):
@@ -32,4 +32,4 @@ JsonReader()
 
 if __name__ == '__main__':
     # app.run()
-    print(json.dumps(JsonReader.ReadFrom("Dungeon", "Puzzles")))
+    print(json.dumps(JsonReader.ReadFrom("Dungeon", "Deadly Traps")))
