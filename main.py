@@ -1,3 +1,4 @@
+import random
 from flask import Flask
 from flask_restful import Resource, Api
 import json
@@ -18,6 +19,14 @@ class JsonReader():
             else:
                 return data[section].get(innerSection)
 
+    def ReadFromSpecific(section = None, innerSection = None, identifier = None):
+        return data[section].get(innerSection)[0]
+
+    def ReadFromRandom(section = None, innerSection = None):
+        rand = random.randint(0, len(data[section].get(innerSection)) - 1)
+        print(rand)
+        return data[section].get(innerSection)[rand]
+
 # class Generator(Resource):
 #     def get(self):
 #         return data, 200
@@ -32,4 +41,4 @@ JsonReader()
 
 if __name__ == '__main__':
     # app.run()
-    print(json.dumps(JsonReader.ReadFrom("Dungeon", "Deadly Traps")))
+    print(json.dumps(JsonReader.ReadFrom("Encounter", "Aerial Encounters")))
