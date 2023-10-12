@@ -20,25 +20,39 @@ class JsonReader():
                 return data[section].get(innerSection)
 
     def ReadFromSpecific(section = None, innerSection = None, identifier = None):
-        return data[section].get(innerSection)[0]
+        return data[section].get(innerSection)[identifier]
 
     def ReadFromRandom(section = None, innerSection = None):
         rand = random.randint(0, len(data[section].get(innerSection)) - 1)
-        print(rand)
         return data[section].get(innerSection)[rand]
 
-# class Generator(Resource):
-#     def get(self):
-#         return data, 200
-
 app = Flask(__name__)
-# api = Api(app)
 JsonReader()
 
 @app.route('/', methods=['GET'])
 def Home():
     return jsonify(JsonReader.ReadFrom())
-
+    
+@app.route('/r/<string:category>', methods=['GET'])
+def RandomCategoryEntry(category):
+    arg = request.args.get('arg', default=None, type=str)
+    if arg is not None:
+        return jsonify(JsonReader.ReadFromRandom(category, arg))
+    else:
+        return  jsonify(JsonReader.ReadFrom(category))
+    
+@app.route('/<string:category>', methods=['GET'])
+def CategorySpecific(category):
+    arg = request.args.get('arg', default=None, type=str)
+    id = request.args.get('id', type=int)
+    if arg is not None:
+        if id is not None:
+            return jsonify(JsonReader.ReadFromSpecific(category, arg, id))
+        else:
+            return jsonify(JsonReader.ReadFrom(category, arg))
+    else:
+        return  jsonify(JsonReader.ReadFrom(category))
+    
 @app.route('/<string:category>', methods=['GET'])
 def Category(category):
     arg = request.args.get('arg', default=None, type=str)
@@ -47,8 +61,5 @@ def Category(category):
     else:
         return  jsonify(JsonReader.ReadFrom(category))
 
-# api.add_resource(Generator, '/')
-
 if __name__ == '__main__':
     app.run(debug=True)
-    # print(json.dumps(JsonReader.ReadFrom("Encounter", "Aerial Encounters")))
