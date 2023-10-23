@@ -1,0 +1,13 @@
+.stretch-button-95 {
+    @media (max-width:770px) {
+        width: 100%;
+    }
+    width: 95%;
+}
+
+.stretch-button-full {
+    @media (max-width:770px) {
+        width: 100%;
+    }
+    width: 97.5%;
+}
