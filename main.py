@@ -11,14 +11,16 @@ app = Flask(__name__,
             static_url_path='',
             static_folder='./static',
             template_folder='./templates')
+api = Api(app) # Maybe I don't need api variable, can i remove the api.add_resource?
+# Found out this has broken my routes setup via @app.route
 swagger = Swagger(app)
 JsonReader()
 
 # Swagger UI
 
-# api.add_resource(Ping, '/ping')
-# api.add_resource(GetAllEntries, '/Resource/All')
-# api.add_resource(CategorySpecific, '/Resource/<string:category>')
+api.add_resource(Ping, '/ping')
+api.add_resource(GetAllEntries, '/Resource/All')
+api.add_resource(CategorySpecific, '/Resource/<string:category>')
 
 # Routes
 
