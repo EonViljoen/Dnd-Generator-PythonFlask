@@ -1,13 +1,26 @@
-from mimetypes import MimeTypes
 import os
 from flask import Flask, jsonify, render_template, request, send_from_directory
+from flask_restful import Resource, Api
+from flasgger import Swagger
 from jsonReader import JsonReader
+from swagger import Ping, GetAllEntries, CategorySpecific
+
+# Init
 
 app = Flask(__name__,
             static_url_path='',
             static_folder='./static',
             template_folder='./templates')
+swagger = Swagger(app)
 JsonReader()
+
+# Swagger UI
+
+# api.add_resource(Ping, '/ping')
+# api.add_resource(GetAllEntries, '/Resource/All')
+# api.add_resource(CategorySpecific, '/Resource/<string:category>')
+
+# Routes
 
 @app.route('/', methods=['GET'])
 def Home():
@@ -17,11 +30,11 @@ def Home():
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', MimeTypes='images/favicon.ico')
 
-@app.route('/All', methods=['GET'])
+@app.route('/Resource/All', methods=['GET'])
 def All():
     return jsonify(JsonReader.ReadFrom())
     
-@app.route('/r/<string:category>', methods=['GET'])
+@app.route('/Resource/r/<string:category>', methods=['GET'])
 def RandomCategoryEntry(category):
     arg = request.args.get('arg', default=None, type=str)
     if arg is not None:
@@ -29,7 +42,7 @@ def RandomCategoryEntry(category):
     else:
         return  jsonify(JsonReader.ReadFrom(category))
     
-@app.route('/<string:category>', methods=['GET'])
+@app.route('/Resource/<string:category>', methods=['GET'])
 def CategorySpecific(category):
     arg = request.args.get('arg', default=None, type=str)
     id = request.args.get('id', type=int)
@@ -41,7 +54,7 @@ def CategorySpecific(category):
     else:
         return  jsonify(JsonReader.ReadFrom(category))
     
-@app.route('/<string:category>', methods=['GET'])
+@app.route('/Resource/<string:category>', methods=['GET'])
 def Category(category):
     arg = request.args.get('arg', default=None, type=str)
     if arg is not None:
@@ -49,5 +62,6 @@ def Category(category):
     else:
         return  jsonify(JsonReader.ReadFrom(category))
     
+# Driver
 if __name__ == '__main__':
     app.run(debug=True)
