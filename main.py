@@ -71,11 +71,16 @@ def CategoryHeadings():
 @app.route('/api/SubHeadings', methods=['GET'])
 def CategorySubHeadings():
     category = request.args.get('category', default=None, type=str)
-    print(category)
     if category is not None:
         return jsonify(JsonReader.GetSubHeadings(category))
     else:
         return jsonify(JsonReader.GetHeadings())
+
+@app.route('/api/EntryCount')
+def EntryCount():
+   category = request.args.get('category', default=None, type=str)
+   subcategory = request.args.get('subcategory', default=None, type=str)
+   return(JsonReader.EntryCount(category, subcategory)) 
 
 # Driver
 if __name__ == '__main__':

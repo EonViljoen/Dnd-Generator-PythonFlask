@@ -35,3 +35,20 @@ class JsonReader():
         for key in data[section].keys():
             list.append(key)
         return list
+    
+    def EntryCount(section = None, innerSection = None):
+        list = []
+        if section is None:
+            for key in data.keys():
+                list.append(key)
+                count = [len(list)] # Dumb way of doing this
+            return count
+        else:
+            if innerSection is None:
+                for key in data.keys():
+                    list.append(key)
+                    count = [len(list)] # Dumb way of doing this
+                return count
+            else:
+                count = [len(data[section].get(innerSection))]
+                return count
