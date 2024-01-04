@@ -1,40 +1,112 @@
 //Card and container generated programmatically, need to integrate with api to generate entire screen programmatically
 
-var header = 'Dungeon'
+GenerateScreen()
+    .then( result => {
+        const script = GenerateToastScript();
 
-const container = document.createElement('div');
-container.className = 'container-md text-md-center';
+        document.body.appendChild(script)
+});
 
-const row = document.createElement('div');
-row.className = 'row py-md-3';
-container.appendChild(row);
+async function GenerateScreen(){
+    const container = GenerateContainer();
+    var row = GenerateRow(container);;
+    var card_header_list;
+    
+    await FetchHeadings()
+        .then( result => {
+            card_header_list = result;
+    
+            var counter = 0;
+            for (const element of card_header_list) {
+                if (counter % 2 === 0 && counter !== 0){
+                    row = GenerateRow(container);
+                }
+                
+                GenerateCard(row, element);
+                counter++; 
+            }
+        });
+    
+    document.body.appendChild(container);
+    return document.body;   
+}
 
-const med_column = document.createElement('div');
-med_column.className = 'col-md';
-row.appendChild(med_column);
+function GenerateCard(row, header){
+    
+    const med_column = document.createElement('div');
+    med_column.className = 'col-md';
+    row.appendChild(med_column);
 
-const card = document.createElement('div');
-card.className = 'card border-dark';
-med_column.appendChild(card);
+    const card = document.createElement('div');
+    card.className = 'card border-dark';
+    med_column.appendChild(card);
 
-const card_header = document.createElement('div');
-card_header.className = 'card-header';
-card_header.innerText = header
-card.appendChild(card_header)
+    const card_header = document.createElement('div');
+    card_header.className = 'card-header';
+    card_header.innerText = header
+    card.appendChild(card_header)
 
-const card_body = document.createElement('div');
-card_body.className = 'card-body';
-card.appendChild(card_body);
+    const card_body = document.createElement('div');
+    card_body.className = 'card-body';
+    card.appendChild(card_body);
 
-const unord_list = document.createElement('ul');
-unord_list.className = 'list-group list-group-flush';
-card_body.appendChild(unord_list);
+    const unord_list = document.createElement('ul');
+    unord_list.className = 'list-group list-group-flush';
+    card_body.appendChild(unord_list);
 
-const button = document.createElement('button');
-button.innerText = 'Puzzles';
-button.type = 'button';
-button.className = 'btn btn-outline-dark';
-button.id = 'puzzleTest';
-unord_list.appendChild(button);
+    FetchSubHeadings(header)
+        .then( result => {
+            button_texts = result;
 
-document.body.appendChild(med_column);
+            for(const element of button_texts){
+                var button = GenerateButton(element)
+                unord_list.appendChild(button);
+            }
+        })
+}
+
+function GenerateRow(container){
+    const row = document.createElement('div');
+    row.className = 'row py-md-3';
+    container.appendChild(row);
+    return row;
+}
+
+function GenerateContainer(){
+    const container = document.createElement('div');
+    container.className = 'container-md text-md-center';
+    return container;
+}
+
+function GenerateEntries(){
+
+}
+
+function GenerateButton(title){
+    const button = document.createElement('button');
+    button.innerText = title;
+    button.type = 'button';
+    button.className = 'btn btn-outline-dark';
+    button.id = 'RetrieveRandomEntry';
+
+    return button;
+}
+
+async function FetchHeadings(){
+    const response = await fetch('http://127.0.0.1:5000/api/Headings');
+    const resJson = await response.json();
+    return resJson;
+    // add error handling
+}
+
+async function FetchSubHeadings(heading){
+    const response = await fetch('http://127.0.0.1:5000/api/SubHeadings?category=' + heading);
+    const resJson = await response.json();
+    return resJson;
+}
+
+function GenerateToastScript(){
+    const script = document.createElement('script');
+    script.src = "../scripts/toasts.js";
+    return script;
+}
