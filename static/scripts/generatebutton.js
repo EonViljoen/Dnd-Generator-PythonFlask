@@ -2,9 +2,9 @@
 
 GenerateScreen()
     .then( result => {
-        const script = GenerateToastScript();
+        // const script = GenerateToastScript();
 
-        document.body.appendChild(script)
+        // document.body.appendChild(script)
 });
 
 async function GenerateScreen(){
@@ -59,7 +59,7 @@ function GenerateCard(row, header){
             button_texts = result;
 
             for(const element of button_texts){
-                var button = GenerateButton(element)
+                var button = GenerateButton(header, element)
                 unord_list.appendChild(button);
             }
         })
@@ -82,12 +82,25 @@ function GenerateEntries(){
 
 }
 
-function GenerateButton(title){
+function GenerateButton(header, title){
     const button = document.createElement('button');
     button.innerText = title;
     button.type = 'button';
-    button.className = 'btn btn-outline-dark';
+    button.className = 'btn btn-outline-dark RandomEntryButton';
     button.id = 'RetrieveRandomEntry';
+
+    button.addEventListener('click', () => {
+        const toastLiveExample = document.getElementById('liveToast');
+        const toastBootstrap = bootstrap.Toast.getOrCreateInstance(toastLiveExample)
+
+        fetch('http://127.0.0.1:5000/api/r/' + header + '?arg=' + title)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('toast-response').innerText = data;
+            });
+
+            toastBootstrap.show();
+    });
 
     return button;
 }

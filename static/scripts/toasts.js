@@ -1,7 +1,6 @@
-var toastTrigger = document.getElementById('RetrieveRandomEntry');
+var toastTrigger = document.getElementsByClassName('RandomEntryButton');
 console.log(toastTrigger)
 const toastLiveExample = document.getElementById('liveToast');
-var toastResponse = null;
 
 if (toastTrigger) {
   console.log('Triggered')
