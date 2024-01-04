@@ -15,8 +15,3 @@ if (toastTrigger) {
             toastBootstrap.show();
   })
 }
-function test(){
-  if (toastResponse !== null) {
-    
-  }
-}
