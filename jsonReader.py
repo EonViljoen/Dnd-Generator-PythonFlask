@@ -23,3 +23,15 @@ class JsonReader():
     def ReadFromRandom(section = None, innerSection = None):
         rand = random.randint(0, len(data[section].get(innerSection)) - 1)
         return data[section].get(innerSection)[rand]
+    
+    def GetHeadings():
+        list = []
+        for key in data.keys():
+            list.append(key)
+        return list
+    
+    def GetSubHeadings(section):
+        list = []
+        for key in data[section].keys():
+            list.append(key)
+        return list

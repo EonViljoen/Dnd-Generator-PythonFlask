@@ -3,7 +3,7 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 from flask_restful import Resource, Api
 from flasgger import Swagger
 from jsonReader import JsonReader
-from swagger import Ping, GetAllEntries, CategorySpecific
+import Swagger_Structure
 
 # Init
 
@@ -18,9 +18,9 @@ JsonReader()
 
 # Swagger UI
 
-api.add_resource(Ping, '/ping')
-api.add_resource(GetAllEntries, '/Resource/All')
-api.add_resource(CategorySpecific, '/Resource/<string:category>')
+# api.add_resource(Swagger_Structure.Ping, '/ping')
+# api.add_resource(Swagger_Structure.GetAllEntries, '/Resource/All')
+# api.add_resource(Swagger_Structure.CategorySpecific, '/Resource/<string:category>')
 
 # Routes
 
@@ -32,11 +32,11 @@ def Home():
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', MimeTypes='images/favicon.ico')
 
-@app.route('/Resource/All', methods=['GET'])
+@app.route('/api/All', methods=['GET'])
 def All():
     return jsonify(JsonReader.ReadFrom())
     
-@app.route('/Resource/r/<string:category>', methods=['GET'])
+@app.route('/api/r/<string:category>', methods=['GET'])
 def RandomCategoryEntry(category):
     arg = request.args.get('arg', default=None, type=str)
     if arg is not None:
@@ -44,7 +44,7 @@ def RandomCategoryEntry(category):
     else:
         return  jsonify(JsonReader.ReadFrom(category))
     
-@app.route('/Resource/<string:category>', methods=['GET'])
+@app.route('/api/<string:category>', methods=['GET'])
 def CategorySpecific(category):
     arg = request.args.get('arg', default=None, type=str)
     id = request.args.get('id', type=int)
@@ -56,14 +56,27 @@ def CategorySpecific(category):
     else:
         return  jsonify(JsonReader.ReadFrom(category))
     
-@app.route('/Resource/<string:category>', methods=['GET'])
+@app.route('/api/<string:category>', methods=['GET'])
 def Category(category):
     arg = request.args.get('arg', default=None, type=str)
     if arg is not None:
         return jsonify(JsonReader.ReadFrom(category, arg))
     else:
         return  jsonify(JsonReader.ReadFrom(category))
-    
+
+@app.route('/api/Headings', methods=['GET'])
+def CategoryHeadings():
+    return jsonify(JsonReader.GetHeadings())
+
+@app.route('/api/SubHeadings', methods=['GET'])
+def CategorySubHeadings():
+    category = request.args.get('category', default=None, type=str)
+    print(category)
+    if category is not None:
+        return jsonify(JsonReader.GetSubHeadings(category))
+    else:
+        return jsonify(JsonReader.GetHeadings())
+
 # Driver
 if __name__ == '__main__':
     app.run(debug=True)
