@@ -10,7 +10,8 @@
     <link rel="stylesheet" href="{{ url_for('static',filename='styles/style.css') }}">
   </head>
   <body>
-    <div class="container-md text-md-center ">
+    <script src="{{url_for('static', filename='scripts/generatebutton.js')}}"></script>
+    <!-- <div class="container-md text-md-center ">
         <div class="row py-md-3">
             <div class="col-md">
                 <div class="card border-dark">
@@ -22,7 +23,6 @@
                             <button type="button" class="btn btn-outline-dark" id="puzzleTest">Puzzles</button>
                             <button type="button" class="btn btn-outline-dark">Empty</button>
                             <button type="button" class="btn btn-outline-dark">Empty</button>
-                            <script src="{{url_for('static', filename='scripts/generatebutton.js')}}"></script>
                           </ul>
                     </div>
                 </div>
@@ -118,7 +118,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </div> -->
 
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
         <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
