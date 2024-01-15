@@ -2,7 +2,7 @@ from flask import jsonify, request
 from flask_restful import Resource
 from jsonReader import JsonReader
 
-class All(Resource):
+class GetAll(Resource):
     def get(self):
         methods = ['GET']
         return jsonify(JsonReader.ReadFrom())
