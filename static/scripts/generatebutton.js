@@ -1,10 +1,5 @@
-//Card and container generated programmatically, need to integrate with api to generate entire screen programmatically
-
 GenerateScreen()
     .then( result => {
-        // const script = GenerateToastScript();
-
-        // document.body.appendChild(script)
 });
 
 async function GenerateScreen(){
@@ -63,30 +58,25 @@ function GenerateCard(row, header){
                 var row = document.createElement('div');
                 row.className = 'row';
 
-                // Create the first column (larger random button)
                 var col1 = document.createElement('div');
-                col1.className = 'col'; // Adjust the size as needed
+                col1.className = 'col';
                 col1.style = 'padding-right: 0px';
                 var randomButton = GenerateRandomButton(header, element);
                 col1.appendChild(randomButton);
 
-                // Create the second column (smaller additional button)
                 var col2 = document.createElement('div');
-                col2.className = 'col-auto'; // Adjust the size as needed
+                col2.className = 'col-auto';
                 col2.style = 'padding-left: 0px';
                 var additionalButton = GenerateEntriesButton(header, element);
                 col2.appendChild(additionalButton);
 
-                // Add both columns to the row
                 row.appendChild(col1);
                 row.appendChild(col2);
 
-                // Create a list item to hold the row
                 var listItem = document.createElement('li');
                 listItem.className = 'list-group-item';
                 listItem.appendChild(row);
 
-                // Add the list item to the unordered list
                 unord_list.appendChild(listItem);
             }
         })
@@ -144,8 +134,6 @@ function GenerateEntriesButton(header, title){
 
     button.addEventListener('click', async () => {
         DisplayEntryModal(header, await FetchEntries(header, title));
-        // document.getElementById('exampleModalLabel').innerText = header;
-        // document.getElementById('entryContent').innerText = FetchEntries(header, title);  //Find a better way of doing this
     });
 
 
@@ -162,8 +150,6 @@ function DisplayEntryModal(title, entries){
     for (const element in entries){
         modalBody.innerHTML += `<p><strong>${element}:</strong> ${entries[element]}</p>`;
     }
-
-    // .innerText = FetchEntries(header, title);  //Find a better way of doing this
 }
 
 async function FetchHeadings(){
