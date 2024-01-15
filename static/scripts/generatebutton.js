@@ -133,7 +133,7 @@ function GenerateEntriesButton(header, title){
     
 
     button.addEventListener('click', async () => {
-        DisplayEntryModal(header, await FetchEntries(header, title));
+        DisplayEntryModal(title, await FetchEntries(header, title));
     });
 
 
