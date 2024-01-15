@@ -59,8 +59,35 @@ function GenerateCard(row, header){
             button_texts = result;
 
             for(const element of button_texts){
-                var button = GenerateButton(header, element)
-                unord_list.appendChild(button);
+
+                var row = document.createElement('div');
+                row.className = 'row';
+
+                // Create the first column (larger random button)
+                var col1 = document.createElement('div');
+                col1.className = 'col'; // Adjust the size as needed
+                col1.style = 'padding-right: 0px';
+                var randomButton = GenerateRandomButton(header, element);
+                col1.appendChild(randomButton);
+
+                // Create the second column (smaller additional button)
+                var col2 = document.createElement('div');
+                col2.className = 'col-auto'; // Adjust the size as needed
+                col2.style = 'padding-left: 0px';
+                var additionalButton = GenerateEntriesButton(header, element);
+                col2.appendChild(additionalButton);
+
+                // Add both columns to the row
+                row.appendChild(col1);
+                row.appendChild(col2);
+
+                // Create a list item to hold the row
+                var listItem = document.createElement('li');
+                listItem.className = 'list-group-item';
+                listItem.appendChild(row);
+
+                // Add the list item to the unordered list
+                unord_list.appendChild(listItem);
             }
         })
 }
@@ -78,15 +105,13 @@ function GenerateContainer(){
     return container;
 }
 
-function GenerateEntries(){
 
-}
-
-function GenerateButton(header, title){
+function GenerateRandomButton(header, title){
     const button = document.createElement('button');
     button.innerText = title;
     button.type = 'button';
-    button.className = 'btn btn-outline-dark RandomEntryButton';
+    button.className = 'btn btn-outline-dark btn-block RandomEntryButton ';
+    button.style = 'width: 100%';
     button.id = 'RetrieveRandomEntry';
 
     button.addEventListener('click', () => {
@@ -102,7 +127,43 @@ function GenerateButton(header, title){
             toastBootstrap.show();
     });
 
+    
     return button;
+}
+
+function GenerateEntriesButton(header, title){
+    const button = document.createElement('button');
+    button.innerText = "Entries";
+    button.className  = 'btn btn-outline-danger';
+    button.style = 'float: right; height: 100%;';
+
+    
+    button.setAttribute('data-bs-target', '#exampleModal');
+    button.setAttribute('data-bs-toggle', 'modal');
+    
+
+    button.addEventListener('click', async () => {
+        DisplayEntryModal(header, await FetchEntries(header, title));
+        // document.getElementById('exampleModalLabel').innerText = header;
+        // document.getElementById('entryContent').innerText = FetchEntries(header, title);  //Find a better way of doing this
+    });
+
+
+    return button;
+
+}
+
+function DisplayEntryModal(title, entries){
+    document.getElementById('exampleModalLabel').innerText = title;
+
+    const modalBody = document.getElementById('entryContent');
+    modalBody.innerText = '';
+
+    for (const element in entries){
+        modalBody.innerHTML += `<p><strong>${element}:</strong> ${entries[element]}</p>`;
+    }
+
+    // .innerText = FetchEntries(header, title);  //Find a better way of doing this
 }
 
 async function FetchHeadings(){
@@ -115,6 +176,12 @@ async function FetchHeadings(){
 async function FetchSubHeadings(heading){
     const response = await fetch('http://127.0.0.1:5000/api/SubHeadings?category=' + heading);
     const resJson = await response.json();
+    return resJson;
+}
+
+async function FetchEntries(header, title){
+    const response = await fetch('http://127.0.0.1:5000/api/' + header + '?arg=' + title);
+    const resJson = await response.json().then( val => document.getElementById('entryContent').innerText = val); //Find a better way of doing this
     return resJson;
 }
 
