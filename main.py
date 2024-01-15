@@ -4,6 +4,7 @@ from flask_restful import Resource, Api
 from flasgger import Swagger
 from jsonReader import JsonReader
 import Swagger_Structure
+import routes
 
 # Init
 
@@ -32,55 +33,13 @@ def Home():
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', MimeTypes='images/favicon.ico')
 
-@app.route('/api/All', methods=['GET'])
-def All():
-    return jsonify(JsonReader.ReadFrom())
-    
-@app.route('/api/r/<string:category>', methods=['GET'])
-def RandomCategoryEntry(category):
-    arg = request.args.get('arg', default=None, type=str)
-    if arg is not None:
-        return jsonify(JsonReader.ReadFromRandom(category, arg))
-    else:
-        return  jsonify(JsonReader.ReadFrom(category))
-    
-@app.route('/api/<string:category>', methods=['GET'])
-def CategorySpecific(category):
-    arg = request.args.get('arg', default=None, type=str)
-    id = request.args.get('id', type=int)
-    if arg is not None:
-        if id is not None:
-            return jsonify(JsonReader.ReadFromSpecific(category, arg, id))
-        else:
-            return jsonify(JsonReader.ReadFrom(category, arg))
-    else:
-        return  jsonify(JsonReader.ReadFrom(category))
-    
-@app.route('/api/<string:category>', methods=['GET'])
-def Category(category):
-    arg = request.args.get('arg', default=None, type=str)
-    if arg is not None:
-        return jsonify(JsonReader.ReadFrom(category, arg))
-    else:
-        return  jsonify(JsonReader.ReadFrom(category))
-
-@app.route('/api/Headings', methods=['GET'])
-def CategoryHeadings():
-    return jsonify(JsonReader.GetHeadings())
-
-@app.route('/api/SubHeadings', methods=['GET'])
-def CategorySubHeadings():
-    category = request.args.get('category', default=None, type=str)
-    if category is not None:
-        return jsonify(JsonReader.GetSubHeadings(category))
-    else:
-        return jsonify(JsonReader.GetHeadings())
-
-@app.route('/api/EntryCount')
-def EntryCount():
-   category = request.args.get('category', default=None, type=str)
-   subcategory = request.args.get('subcategory', default=None, type=str)
-   return(JsonReader.EntryCount(category, subcategory)) 
+api.add_resource(routes.All,'/api/getall')
+api.add_resource(routes.RandomCategoryEntry, '/api/r/<string:category>')
+api.add_resource(routes.CategorySpecific, '/api/<string:category>')
+api.add_resource(routes.Category, '/api/<string:category>')
+api.add_resource(routes.CategoryHeadings, '/api/Headings')
+api.add_resource(routes.CategorySubHeadings, '/api/SubHeadings')
+api.add_resource(routes.EntryCount, '/api/EntryCount')
 
 # Driver
 if __name__ == '__main__':
