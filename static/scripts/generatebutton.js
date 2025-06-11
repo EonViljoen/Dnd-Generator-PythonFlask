@@ -108,7 +108,7 @@ function GenerateRandomButton(header, title){
         const toastLiveExample = document.getElementById('liveToast');
         const toastBootstrap = bootstrap.Toast.getOrCreateInstance(toastLiveExample)
 
-        fetch('http://127.0.0.1:5000/api/r/' + header + '?arg=' + title)
+        fetch('/api/r/' + header + '?arg=' + title)
             .then(res => res.json())
             .then(data => {
                 document.getElementById('toast-response').innerText = data;
@@ -153,20 +153,20 @@ function DisplayEntryModal(title, entries){
 }
 
 async function FetchHeadings(){
-    const response = await fetch('http://127.0.0.1:5000/api/Headings');
+    const response = await fetch('/api/Headings');
     const resJson = await response.json();
     return resJson;
     // add error handling
 }
 
 async function FetchSubHeadings(heading){
-    const response = await fetch('http://127.0.0.1:5000/api/SubHeadings?category=' + heading);
+    const response = await fetch('/api/SubHeadings?category=' + heading);
     const resJson = await response.json();
     return resJson;
 }
 
 async function FetchEntries(header, title){
-    const response = await fetch('http://127.0.0.1:5000/api/' + header + '?arg=' + title);
+    const response = await fetch('/api/' + header + '?arg=' + title);
     const resJson = await response.json().then( val => document.getElementById('entryContent').innerText = val); //Find a better way of doing this
     return resJson;
 }
