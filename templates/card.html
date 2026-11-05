@@ -11,6 +11,9 @@
         <button type="button" class="btn-surprise" id="btn-surprise" title="Roll on a random table (S)">
           <i class="bi bi-shuffle" aria-hidden="true"></i><span>Surprise me</span>
         </button>
+        <button type="button" class="btn-surprise btn-customize" id="btn-customize" title="Choose which tables to show, or load your own">
+          <i class="bi bi-sliders" aria-hidden="true"></i><span>Customize</span>
+        </button>
 {% endblock %}
 
 {% block content %}
@@ -21,8 +24,11 @@
       </nav>
 
       <!-- Selected category / search results -->
-      <main class="content" id="content" aria-live="polite">
-        <p class="loading"><span class="spinner-border spinner-border-sm"></span> Unrolling the scrolls…</p>
+      <main class="content">
+        <div id="data-banner" class="data-banner" hidden></div>
+        <div id="content" aria-live="polite">
+          <p class="loading"><span class="spinner-border spinner-border-sm"></span> Unrolling the scrolls…</p>
+        </div>
       </main>
 
       <!-- Result + pins + history -->
@@ -93,11 +99,87 @@
       </div>
     </div>
 
+    <!-- Customize modal -->
+    <div class="modal fade" id="customizeModal" tabindex="-1" aria-labelledby="customizeModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div class="flex-grow-1">
+              <div class="modal-kicker">Customize</div>
+              <h5 class="modal-title" id="customizeModalLabel">Your tables</h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body cz">
+            <!-- Data source -->
+            <section class="cz-section">
+              <h6 class="cz-heading"><i class="bi bi-file-earmark-code"></i> Your own JSON</h6>
+              <div id="cz-status" class="cz-status"></div>
+
+              <fieldset class="cz-modes">
+                <legend class="visually-hidden">How to use your file</legend>
+                <label class="cz-mode">
+                  <input type="radio" name="cz-mode" value="merge" checked>
+                  <span><strong>Add to the defaults</strong><small>Your tables appear alongside the built-in ones. Entries for a table that already exists are added to it.</small></span>
+                </label>
+                <label class="cz-mode">
+                  <input type="radio" name="cz-mode" value="replace">
+                  <span><strong>Replace the defaults</strong><small>Only the tables in your file are shown.</small></span>
+                </label>
+              </fieldset>
+
+              <label class="cz-drop" id="cz-drop">
+                <input type="file" id="cz-file" accept=".json,application/json" class="visually-hidden">
+                <i class="bi bi-upload" aria-hidden="true"></i>
+                <span><strong>Choose a JSON file</strong> or drop it here</span>
+                <small>Format: <code>{ "Category": { "Table": ["entry", "entry"] } }</code></small>
+              </label>
+              <div id="cz-messages" class="cz-messages" aria-live="polite"></div>
+
+              <div class="cz-actions">
+                <a class="btn-outline-gold btn-sm-gold" href="/api/getall" download="dnd-prompt-tables.json">
+                  <i class="bi bi-download"></i> Download the defaults as a template
+                </a>
+                <button type="button" class="btn-outline-gold btn-sm-gold" id="cz-export" hidden>
+                  <i class="bi bi-box-arrow-down"></i> Export your file
+                </button>
+                <button type="button" class="btn-outline-danger-ink btn-sm-gold" id="cz-reset" hidden>
+                  <i class="bi bi-arrow-counterclockwise"></i> Remove your file
+                </button>
+              </div>
+              <p class="cz-note">
+                <i class="bi bi-shield-lock"></i>
+                Your file stays in this browser and is never uploaded. It won't follow you to other
+                devices, and clearing site data removes it, so keep a copy (Export) somewhere safe.
+              </p>
+            </section>
+
+            <!-- Visibility -->
+            <section class="cz-section">
+              <div class="cz-vis-head">
+                <h6 class="cz-heading"><i class="bi bi-eye"></i> Show or hide tables</h6>
+                <span id="cz-vis-count" class="cz-vis-count"></span>
+              </div>
+              <div class="cz-vis-tools">
+                <div class="modal-filter cz-vis-filter">
+                  <i class="bi bi-funnel" aria-hidden="true"></i>
+                  <input type="search" id="cz-vis-filter" placeholder="Filter tables…" aria-label="Filter tables" autocomplete="off">
+                </div>
+                <button type="button" class="link-btn" id="cz-show-all">Show all</button>
+                <button type="button" class="link-btn" id="cz-hide-all">Hide all</button>
+              </div>
+              <div id="cz-vis-list" class="cz-vis-list"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="copy-toast" id="copy-toast" role="status" aria-live="polite"></div>
 
 {% endblock %}
 
 {% block scripts %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-    <script src="{{ url_for('static', filename='scripts/app.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='scripts/app.js') }}"></script>
 {% endblock %}

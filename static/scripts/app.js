@@ -1,8 +1,11 @@
-// D&D Prompt Helper – cards page
-(() => {
-    'use strict';
+// D&D Prompt Helper – cards page (ES module)
+import {
+    api, customData, createSource, parseCustomJson, ValidationError, downloadJson, MAX_FILE_BYTES,
+} from './data.js';
 
+{
     const HISTORY_KEY = 'dnd.history';
+    const HIDDEN_KEY = 'dnd.hidden';
     const PINS_KEY = 'dnd.pins';
     const HISTORY_LIMIT = 10;
     const MIN_TEXT_SEARCH = 3;
@@ -15,6 +18,8 @@
     const els = {
         nav: $('cat-nav-list'),
         content: $('content'),
+        banner: $('data-banner'),
+        customize: $('btn-customize'),
         search: $('search-input'),
         surprise: $('btn-surprise'),
         searchForm: $('search-form'),
@@ -38,8 +43,13 @@
         toast: $('copy-toast'),
     };
 
-    let structure = [];
-    let combos = [];
+    let source = null;        // ServerSource | LocalSource (see data.js)
+    let serverStructure = []; // default tables, used for category icons/blurbs
+    let custom = null;        // stored custom JSON record, or null
+    let allStructure = [];    // every table in the active source
+    let structure = [];       // visible tables only (hidden ones removed)
+    let recipes = [];         // quick build recipes from the server
+    let combos = [];          // recipes limited to parts whose tables are available
     let view = null;          // { type: 'category', name } | { type: 'combos' } | { type: 'search', q }
     let lastCategory = null;
     let current = null;       // { category, sub, text } or a combo: { comboId, category, sub, text, parts }
@@ -57,15 +67,7 @@
     }
     let history = load(HISTORY_KEY);
     let pins = load(PINS_KEY);
-
-    // ---------- API ----------
-    function api(path, params) {
-        const qs = params ? '?' + new URLSearchParams(params) : '';
-        return fetch('/api/' + path.map(encodeURIComponent).join('/') + qs).then((res) => {
-            if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
-            return res.json();
-        });
-    }
+    let hidden = new Set(load(HIDDEN_KEY));
 
     // ---------- DOM helpers ----------
     function el(tag, attrs = {}, ...children) {
@@ -180,11 +182,33 @@
         renderContent();
     }
 
+    // First thing worth showing: the hash, the current view if still valid, else the first category
+    function fallbackView() {
+        const stillValid = view && (
+            (view.type === 'category' && structure.some((c) => c.name === view.name)) ||
+            (view.type === 'combos' && combos.length) ||
+            view.type === 'search');
+        if (stillValid) return view;
+        if (structure.length) return { type: 'category', name: structure[0].name };
+        if (combos.length) return { type: 'combos' };
+        return { type: 'empty' };
+    }
+
     // ---------- Content ----------
     function renderContent() {
         if (view.type === 'category') renderCategory(view.name);
         else if (view.type === 'combos') renderCombos();
-        else renderSearch(view.q);
+        else if (view.type === 'search') renderSearch(view.q);
+        else renderEmpty();
+    }
+
+    function renderEmpty() {
+        els.content.replaceChildren(
+            el('div', { class: 'empty-state empty-state-lg' },
+                icon('eye-slash'),
+                el('p', { text: 'Every table is hidden.' }),
+                el('button', { type: 'button', class: 'btn-gold', onclick: openCustomize },
+                    icon('sliders'), el('span', { text: 'Choose tables to show' }))));
     }
 
     function renderCategory(name) {
@@ -268,9 +292,12 @@
         markActiveTile();
         startRolling();
         try {
-            const data = await api(['combos', id]);
+            const combo = combos.find((c) => c.id === id);
+            if (!combo) throw new Error('not available');
+            const texts = await Promise.all(combo.parts.map((p) => source.roll(p.category, p.sub)));
             if (seq !== rollSeq) return;
-            const item = comboItem(data.id, data.title, data.parts);
+            const parts = combo.parts.map((p, i) => ({ ...p, text: texts[i] }));
+            const item = comboItem(combo.id, combo.title, parts);
             showResult(item, { animate: true });
             addToHistory(item);
         } catch (err) {
@@ -287,7 +314,7 @@
         const row = els.text.querySelectorAll('.result-part')[index];
         if (row) row.classList.add('loading');
         try {
-            const text = await api(['r', part.category], { arg: part.sub });
+            const text = await source.roll(part.category, part.sub);
             if (current !== before) return; // something else was shown meanwhile
             const parts = before.parts.map((p, i) => (i === index ? { ...p, text } : p));
             const item = comboItem(before.comboId, before.sub, parts);
@@ -330,9 +357,17 @@
         }
 
         const seq = ++searchSeq;
-        api(['search'], { q: needle, limit: 50 })
+        const anyHidden = allStructure.some((c) => c.subcategories.some((s) => hidden.has(keyOf(c.name, s.name))));
+        source.search(needle, anyHidden ? 200 : 50)
             .then(({ total, results }) => {
                 if (seq !== searchSeq) return;
+                if (anyHidden) {
+                    // Hidden tables are filtered here, so the exact total isn't known
+                    const more = total > results.length;
+                    results = results.filter((r) => !hidden.has(keyOf(r.category, r.sub)));
+                    total = results.length + (more ? 1 : 0);
+                    results = results.slice(0, 50);
+                }
                 promptSection.previousSibling.textContent = 'Prompts (' + total.toLocaleString() + ')';
                 if (!results.length) {
                     promptSection.replaceChildren(el('p', { class: 'empty-state', text: 'No prompts contain “' + needle + '”.' }));
@@ -382,7 +417,7 @@
         markActiveTile();
         startRolling();
         try {
-            const text = await api(['r', category], { arg: sub });
+            const text = await source.roll(category, sub);
             if (seq !== rollSeq) return;
             const item = { category, sub, text };
             showResult(item, { animate: true });
@@ -592,7 +627,7 @@
         els.modalList.replaceChildren(el('li', { class: 'text-body-secondary', text: 'Loading…' }));
         modal.show();
         try {
-            const entries = await api([category], { arg: sub });
+            const entries = await source.entries(category, sub);
             if (!modalTable || modalTable.category !== category || modalTable.sub !== sub) return;
             modalTable.entries = entries;
             renderEntries();
@@ -644,14 +679,260 @@
         if (window.matchMedia('(pointer: fine)').matches) els.modalFilter.focus();
     });
 
+    // ---------- Data source & visibility ----------
+    function recomputeVisible() {
+        structure = allStructure
+            .map((cat) => {
+                const subcategories = cat.subcategories.filter((s) => !hidden.has(keyOf(cat.name, s.name)));
+                return { ...cat, subcategories, total: subcategories.reduce((n, s) => n + s.count, 0) };
+            })
+            .filter((cat) => cat.subcategories.length);
+        const available = new Set(structure.flatMap((c) => c.subcategories.map((s) => keyOf(c.name, s.name))));
+        combos = recipes
+            .map((r) => ({ ...r, parts: r.parts.filter((p) => available.has(keyOf(p.category, p.sub))) }))
+            .filter((r) => r.parts.length >= 2); // one line isn't much of a "build"
+        els.surprise.disabled = !structure.length;
+    }
+
+    async function loadSource() {
+        custom = await customData.load();
+        source = await createSource(custom, serverStructure);
+        allStructure = await source.structure();
+        recomputeVisible();
+        renderBanner();
+    }
+
+    function refresh() {
+        recomputeVisible();
+        renderBanner();
+        const next = fallbackView();
+        if (next.type === 'category') history_replace('#' + encodeURIComponent(next.name));
+        else if (next.type === 'combos') history_replace('#' + QUICK_HASH);
+        setView(next);
+    }
+
+    function hiddenCount() {
+        let n = 0;
+        for (const c of allStructure) for (const s of c.subcategories) if (hidden.has(keyOf(c.name, s.name))) n += 1;
+        return n;
+    }
+
+    function renderBanner() {
+        const nHidden = hiddenCount();
+        const parts = [];
+        if (custom) {
+            parts.push(el('span', {},
+                icon('file-earmark-code'), ' Using ',
+                el('strong', { text: custom.name || 'your file' }),
+                custom.mode === 'replace' ? ' instead of the defaults' : ' with the defaults'));
+        }
+        if (nHidden) parts.push(el('span', {}, icon('eye-slash'), ' ' + plural(nHidden, 'table') + ' hidden'));
+        els.banner.hidden = !parts.length;
+        if (!parts.length) { els.banner.replaceChildren(); return; }
+        els.banner.replaceChildren(
+            el('div', { class: 'data-banner-text' }, ...parts),
+            el('button', { type: 'button', class: 'link-btn', onclick: openCustomize, text: 'Customize' }));
+    }
+
+    // ---------- Customize modal ----------
+    const cz = {
+        modalEl: $('customizeModal'),
+        status: $('cz-status'),
+        file: $('cz-file'),
+        drop: $('cz-drop'),
+        messages: $('cz-messages'),
+        exportBtn: $('cz-export'),
+        resetBtn: $('cz-reset'),
+        visList: $('cz-vis-list'),
+        visCount: $('cz-vis-count'),
+        visFilter: $('cz-vis-filter'),
+        showAll: $('cz-show-all'),
+        hideAll: $('cz-hide-all'),
+        modes: () => document.querySelectorAll('input[name="cz-mode"]'),
+    };
+    const czModal = new bootstrap.Modal(cz.modalEl);
+
+    function openCustomize() {
+        renderCustomize();
+        czModal.show();
+    }
+    els.customize.addEventListener('click', openCustomize);
+
+    function renderCustomize() {
+        // Status
+        if (custom) {
+            const when = custom.uploadedAt ? new Date(custom.uploadedAt).toLocaleDateString() : '';
+            cz.status.replaceChildren(
+                el('div', { class: 'cz-status-card is-custom' },
+                    icon('check-circle-fill'),
+                    el('div', {},
+                        el('strong', { text: custom.name || 'Your file' }),
+                        el('small', { text: plural(custom.tables, 'table') + ' · ' + plural(custom.prompts, 'prompt') + (when ? ' · loaded ' + when : '') }))));
+        } else {
+            cz.status.replaceChildren(
+                el('div', { class: 'cz-status-card' },
+                    icon('info-circle'),
+                    el('div', {},
+                        el('strong', { text: 'Using the built-in tables' }),
+                        el('small', { text: 'Load a JSON file to add your own tables or replace them entirely.' }))));
+        }
+        const mode = custom ? custom.mode : pendingMode;
+        for (const radio of cz.modes()) radio.checked = radio.value === mode;
+        cz.exportBtn.hidden = cz.resetBtn.hidden = !custom;
+        renderVisibility();
+    }
+
+    let pendingMode = 'merge';
+    for (const radio of cz.modes()) {
+        radio.addEventListener('change', async () => {
+            if (!radio.checked) return;
+            pendingMode = radio.value;
+            if (!custom || custom.mode === radio.value) return;
+            await applyCustom({ ...custom, mode: radio.value },
+                radio.value === 'replace' ? 'Now showing only your tables.' : 'Your tables are now added to the defaults.');
+        });
+    }
+
+    function showMessages(kind, title, lines = []) {
+        cz.messages.replaceChildren(
+            el('div', { class: 'cz-msg cz-msg-' + kind },
+                el('strong', { text: title }),
+                lines.length ? el('ul', {}, ...lines.map((l) => el('li', { text: l }))) : null));
+    }
+
+    async function applyCustom(record, successMessage) {
+        try {
+            if (record) await customData.save(record);
+            else await customData.clear();
+            await loadSource();
+            refresh();
+            renderCustomize();
+            if (successMessage) toast(successMessage);
+            return true;
+        } catch (err) {
+            showMessages('error', 'Could not save your tables in this browser.', [err.message || String(err)]);
+            return false;
+        }
+    }
+
+    async function handleFile(file) {
+        cz.messages.replaceChildren();
+        if (!file) return;
+        if (file.size > MAX_FILE_BYTES) {
+            showMessages('error', 'That file is too large.', ['The limit is ' + (MAX_FILE_BYTES / 1024 / 1024) + ' MB.']);
+            return;
+        }
+        let parsed;
+        try {
+            parsed = parseCustomJson(await file.text());
+        } catch (err) {
+            if (err instanceof ValidationError) showMessages('error', 'That file couldn’t be loaded:', err.issues);
+            else showMessages('error', 'That file couldn’t be read.', [err.message]);
+            return;
+        }
+        const ok = await applyCustom({
+            mode: pendingMode,
+            name: file.name,
+            uploadedAt: new Date().toISOString(),
+            data: parsed.data,
+            tables: parsed.tables,
+            prompts: parsed.prompts,
+        }, 'Loaded ' + plural(parsed.tables, 'table') + ' from ' + file.name);
+        if (!ok) return;
+        if (parsed.warnings.length) showMessages('warn', 'Loaded, with a few notes:', parsed.warnings.slice(0, 8));
+        else showMessages('ok', 'Loaded ' + plural(parsed.tables, 'table') + ' and ' + plural(parsed.prompts, 'prompt') + '.');
+    }
+
+    cz.file.addEventListener('change', () => {
+        handleFile(cz.file.files[0]);
+        cz.file.value = ''; // allow re-selecting the same file
+    });
+    cz.drop.addEventListener('dragover', (e) => { e.preventDefault(); cz.drop.classList.add('is-over'); });
+    cz.drop.addEventListener('dragleave', () => cz.drop.classList.remove('is-over'));
+    cz.drop.addEventListener('drop', (e) => {
+        e.preventDefault();
+        cz.drop.classList.remove('is-over');
+        handleFile(e.dataTransfer.files[0]);
+    });
+
+    cz.exportBtn.addEventListener('click', () => {
+        if (custom) downloadJson(custom.data, (custom.name || 'my-tables.json').replace(/(\.json)?$/i, '.json'));
+    });
+    cz.resetBtn.addEventListener('click', async () => {
+        if (!custom) return;
+        if (!window.confirm('Remove “' + (custom.name || 'your file') + '” from this browser? Export it first if you want to keep a copy.')) return;
+        cz.messages.replaceChildren();
+        await applyCustom(null, 'Back to the built-in tables.');
+    });
+
+    // Visibility list
+    function setHidden(keys, hide) {
+        for (const k of keys) { if (hide) hidden.add(k); else hidden.delete(k); }
+        save(HIDDEN_KEY, [...hidden]);
+        refresh();
+        renderVisibility();
+    }
+
+    function renderVisibility() {
+        const needle = cz.visFilter.value.trim().toLowerCase();
+        const total = allStructure.reduce((n, c) => n + c.subcategories.length, 0);
+        cz.visCount.textContent = (total - hiddenCount()) + ' of ' + total + ' shown';
+
+        const groups = [];
+        for (const cat of allStructure) {
+            const subs = cat.subcategories.filter((s) => !needle || s.name.toLowerCase().includes(needle) || cat.name.toLowerCase().includes(needle));
+            if (!subs.length) continue;
+            const keys = subs.map((s) => keyOf(cat.name, s.name));
+            const shown = keys.filter((k) => !hidden.has(k)).length;
+
+            const catBox = el('input', {
+                type: 'checkbox',
+                'aria-label': 'Show all ' + cat.name + ' tables',
+                onchange: (e) => setHidden(keys, !e.currentTarget.checked),
+            });
+            catBox.checked = shown === keys.length;
+            catBox.indeterminate = shown > 0 && shown < keys.length;
+
+            groups.push(el('fieldset', { class: 'cz-group' },
+                el('legend', {},
+                    el('label', { class: 'cz-group-label' }, catBox, icon(cat.icon), el('span', { text: cat.name })),
+                    el('span', { class: 'cz-group-count', text: shown + '/' + keys.length })),
+                el('div', { class: 'cz-tables' }, ...subs.map((s) => {
+                    const key = keyOf(cat.name, s.name);
+                    const box = el('input', { type: 'checkbox', onchange: (e) => setHidden([key], !e.currentTarget.checked) });
+                    box.checked = !hidden.has(key);
+                    return el('label', { class: 'cz-table' }, box,
+                        el('span', { class: 'cz-table-name', text: s.name }),
+                        el('span', { class: 'cz-table-count', text: s.count }));
+                }))));
+        }
+        cz.visList.replaceChildren(...(groups.length ? groups : [el('p', { class: 'side-list-empty', text: 'No tables match.' })]));
+    }
+
+    cz.visFilter.addEventListener('input', renderVisibility);
+    const allKeys = () => allStructure.flatMap((c) => c.subcategories.map((s) => keyOf(c.name, s.name)));
+    cz.showAll.addEventListener('click', () => setHidden(allKeys(), false));
+    cz.hideAll.addEventListener('click', () => setHidden(allKeys(), true));
+
     // ---------- Init ----------
     renderPins();
     renderHistory();
     Promise.all([api(['structure']), api(['combos']).catch(() => [])])
-        .then(([data, comboList]) => {
-            structure = data;
-            combos = comboList;
-            setView(viewFromHash() || { type: 'category', name: structure[0].name });
+        .then(async ([data, comboList]) => {
+            serverStructure = data;
+            recipes = comboList;
+            try {
+                await loadSource();
+            } catch (err) {
+                // Custom data unusable (e.g. defaults failed to load for merging): fall back to the server
+                custom = null;
+                source = await createSource(null, serverStructure);
+                allStructure = serverStructure;
+                recomputeVisible();
+                renderBanner();
+                toast('Couldn’t load your custom tables, showing the defaults');
+            }
+            setView(viewFromHash() || fallbackView());
         })
         .catch((err) => {
             els.content.replaceChildren(el('div', { class: 'empty-state', text: 'Could not load categories (' + err.message + '). Refresh to try again.' }));
@@ -663,4 +944,4 @@
         if (next.type === 'combos') goToCombos();
         else goToCategory(next.name);
     });
-})();
+}

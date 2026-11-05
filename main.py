@@ -9,6 +9,8 @@ app = Flask(__name__,
             static_url_path='',
             static_folder='./static',
             template_folder='./templates')
+# Keep JSON keys in file order so /api/getall matches the site (and works as an upload template)
+app.json.sort_keys = False
 JsonReader()
 
 # Routes

@@ -40,6 +40,15 @@ Json is structure a specific way for the App to be able to read single / multipl
 
 To add a new Main / Sub Topic, simply add a object / collection into the json file, either at the end or a middle of Json Collections.
 
+## Using Your Own Tables (no upload to the server)
+On the generator page, **Customize** lets each user tailor the tables without changing them for anyone else:
+
+- **Show or hide tables**: tick the tables you want on `/cards`. Stored in the browser's localStorage.
+- **Load your own JSON** (same structure as above), either *added to the defaults* (new tables are added, entries for an existing table are appended) or *replacing the defaults*. The file is validated in the browser and stored in IndexedDB. It is never sent to the server, so rolling, searching and Quick builds run in the browser while custom data is active.
+- **Download the defaults as a template** (`/api/getall`), **Export** your file, or **Remove** it to go back to the built-in tables.
+
+Because the data lives in that browser only, it doesn't sync between devices and is lost if site data is cleared. Export keeps a copy.
+
 ## Topics
 |Topic      |Sub Topics               |About                              |
 |-----------|-------------------------|-----------------------------------|
@@ -54,5 +63,4 @@ To add a new Main / Sub Topic, simply add a object / collection into the json fi
 ## TODO
 - Create users
 - Create users login
-- Allow users to upload custom jsons in required format
 - Allow jsons to be editable

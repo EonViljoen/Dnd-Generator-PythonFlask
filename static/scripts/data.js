@@ -1,0 +1,246 @@
+// Data layer for the generator: where tables come from and how they're rolled.
+//
+// - ServerSource: the default tables, rolled by the Flask API.
+// - LocalSource:  tables held in the browser (a user's custom JSON, optionally
+//                 merged with the defaults). Rolling/searching happen here.
+//
+// Custom JSON is stored only in this browser (IndexedDB). It is never sent
+// to the server.
+
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_NAME_LENGTH = 120;
+const MAX_REPORTED_ISSUES = 8;
+
+// ---------- API ----------
+export function api(path, params) {
+    const qs = params ? '?' + new URLSearchParams(params) : '';
+    return fetch('/api/' + path.map(encodeURIComponent).join('/') + qs).then((res) => {
+        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+        return res.json();
+    });
+}
+
+// ---------- IndexedDB key/value store ----------
+const DB_NAME = 'dnd-prompt-helper';
+const STORE = 'kv';
+let dbPromise = null;
+
+function openDb() {
+    if (!dbPromise) {
+        dbPromise = new Promise((resolve, reject) => {
+            if (!('indexedDB' in window)) {
+                reject(new Error('This browser does not support IndexedDB'));
+                return;
+            }
+            const req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+        dbPromise.catch(() => { dbPromise = null; });
+    }
+    return dbPromise;
+}
+
+async function idb(mode, fn) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, mode);
+        const req = fn(tx.objectStore(STORE));
+        tx.oncomplete = () => resolve(req.result);
+        tx.onerror = tx.onabort = () => reject(tx.error || req.error);
+    });
+}
+
+export const storage = {
+    get: (key) => idb('readonly', (s) => s.get(key)),
+    set: (key, value) => idb('readwrite', (s) => s.put(value, key)),
+    del: (key) => idb('readwrite', (s) => s.delete(key)),
+};
+
+// ---------- Custom data ----------
+// Stored shape: { mode: 'merge' | 'replace', name, uploadedAt, data, tables, prompts }
+const CUSTOM_KEY = 'custom';
+
+export const customData = {
+    async load() {
+        try { return (await storage.get(CUSTOM_KEY)) || null; }
+        catch { return null; }
+    },
+    async save(record) {
+        await storage.set(CUSTOM_KEY, record);
+        // Ask the browser not to evict it under storage pressure (best-effort)
+        try { await navigator.storage?.persist?.(); } catch { /* ignore */ }
+    },
+    clear: () => storage.del(CUSTOM_KEY),
+};
+
+export class ValidationError extends Error {
+    constructor(issues) {
+        super(issues[0]);
+        this.issues = issues;
+    }
+}
+
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+// Parse and validate an uploaded file: { category: { table: [entries] } }.
+// Returns { data, tables, prompts, warnings } or throws ValidationError.
+export function parseCustomJson(text) {
+    let raw;
+    try {
+        raw = JSON.parse(text);
+    } catch (err) {
+        throw new ValidationError(['This file isn’t valid JSON (' + err.message + ').']);
+    }
+    if (!isPlainObject(raw)) {
+        throw new ValidationError(['The file must be an object of categories, like { "Town": { "Tavern Names": ["…"] } }.']);
+    }
+
+    const issues = [];
+    const warnings = [];
+    const data = {};
+    let tables = 0;
+    let prompts = 0;
+    const issue = (msg) => { if (issues.length < MAX_REPORTED_ISSUES) issues.push(msg); else issues.overflow = true; };
+
+    for (const [rawCat, subs] of Object.entries(raw)) {
+        const cat = rawCat.trim();
+        if (!cat) { issue('A category has an empty name.'); continue; }
+        if (cat.length > MAX_NAME_LENGTH) { issue('Category “' + cat.slice(0, 40) + '…” has a name longer than ' + MAX_NAME_LENGTH + ' characters.'); continue; }
+        if (!isPlainObject(subs)) { issue('“' + cat + '” must be an object of tables, like { "Table name": ["entry", …] }.'); continue; }
+
+        const outSubs = {};
+        for (const [rawSub, entries] of Object.entries(subs)) {
+            const sub = rawSub.trim();
+            const where = cat + ' › ' + (sub || '(unnamed)');
+            if (!sub) { issue('A table in “' + cat + '” has an empty name.'); continue; }
+            if (sub.length > MAX_NAME_LENGTH) { issue(where.slice(0, 60) + '… has a name longer than ' + MAX_NAME_LENGTH + ' characters.'); continue; }
+            if (!Array.isArray(entries)) { issue(where + ' must be a list of entries, like ["entry one", "entry two"].'); continue; }
+
+            const out = [];
+            entries.forEach((entry, i) => {
+                if (typeof entry === 'number') entry = String(entry);
+                if (typeof entry !== 'string') { issue(where + ': entry ' + (i + 1) + ' isn’t text.'); return; }
+                const trimmed = entry.trim();
+                if (trimmed) out.push(trimmed);
+            });
+            if (!out.length) { warnings.push(where + ' has no entries and was skipped.'); continue; }
+            if (out.length < entries.length) warnings.push(where + ': ' + (entries.length - out.length) + ' empty entr' + (entries.length - out.length === 1 ? 'y was' : 'ies were') + ' skipped.');
+            outSubs[sub] = out;
+            tables += 1;
+            prompts += out.length;
+        }
+        if (Object.keys(outSubs).length) data[cat] = outSubs;
+        else if (isPlainObject(subs)) warnings.push('“' + cat + '” has no usable tables and was skipped.');
+    }
+
+    if (issues.length) {
+        if (issues.overflow) issues.push('…and more. Fix these first and try again.');
+        throw new ValidationError(issues);
+    }
+    if (!tables) throw new ValidationError(['The file doesn’t contain any tables with entries.']);
+    return { data, tables, prompts, warnings };
+}
+
+// Defaults plus custom: new categories/tables are added, and entries for an
+// existing table are appended (exact duplicates skipped).
+export function mergeData(base, custom) {
+    const out = {};
+    for (const [cat, subs] of Object.entries(base)) {
+        out[cat] = {};
+        for (const [sub, entries] of Object.entries(subs)) out[cat][sub] = entries.slice();
+    }
+    for (const [cat, subs] of Object.entries(custom)) {
+        out[cat] = out[cat] || {};
+        for (const [sub, entries] of Object.entries(subs)) {
+            const existing = out[cat][sub];
+            if (!existing) { out[cat][sub] = entries.slice(); continue; }
+            const seen = new Set(existing);
+            for (const e of entries) if (!seen.has(e)) { existing.push(e); seen.add(e); }
+        }
+    }
+    return out;
+}
+
+export function downloadJson(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---------- Sources ----------
+// Both sources expose the same async interface:
+//   structure() -> [{ name, icon, blurb, total, subcategories: [{ name, count }] }]
+//   roll(category, sub) -> text
+//   entries(category, sub) -> [text]
+//   search(q, limit) -> { total, results: [{ category, sub, index, text }] }
+
+export class ServerSource {
+    constructor(structure) {
+        this.kind = 'server';
+        this._structure = structure;
+    }
+    async structure() { return this._structure; }
+    roll(category, sub) { return api(['r', category], { arg: sub }); }
+    entries(category, sub) { return api([category], { arg: sub }); }
+    search(q, limit) { return api(['search'], { q, limit }); }
+}
+
+export class LocalSource {
+    // meta: { categoryName: { icon, blurb } } from the server, for categories that share a name
+    constructor(data, meta = {}) {
+        this.kind = 'local';
+        this.data = data;
+        this._structure = Object.entries(data).map(([name, subs]) => {
+            const subcategories = Object.entries(subs).map(([sub, entries]) => ({ name: sub, count: entries.length }));
+            return {
+                name,
+                icon: meta[name]?.icon || 'journal-bookmark',
+                blurb: meta[name]?.blurb || '',
+                total: subcategories.reduce((n, s) => n + s.count, 0),
+                subcategories,
+            };
+        });
+    }
+    _table(category, sub) {
+        const table = this.data[category]?.[sub];
+        if (!table) throw new Error('table not found');
+        return table;
+    }
+    async structure() { return this._structure; }
+    async roll(category, sub) {
+        const table = this._table(category, sub);
+        return table[Math.floor(Math.random() * table.length)];
+    }
+    async entries(category, sub) { return this._table(category, sub); }
+    async search(q, limit = 50) {
+        const needle = q.trim().toLowerCase();
+        const results = [];
+        let total = 0;
+        if (!needle) return { total, results };
+        for (const [category, subs] of Object.entries(this.data)) {
+            for (const [sub, entries] of Object.entries(subs)) {
+                entries.forEach((text, index) => {
+                    if (!text.toLowerCase().includes(needle)) return;
+                    total += 1;
+                    if (results.length < limit) results.push({ category, sub, index, text });
+                });
+            }
+        }
+        return { total, results };
+    }
+}
+
+// Pick the source for the stored custom data (or the server if there is none).
+export async function createSource(custom, serverStructure) {
+    if (!custom) return new ServerSource(serverStructure);
+    const meta = Object.fromEntries(serverStructure.map((c) => [c.name, c]));
+    if (custom.mode === 'replace') return new LocalSource(custom.data, meta);
+    const base = await api(['getall']);
+    return new LocalSource(mergeData(base, custom.data), meta);
+}
