@@ -6,6 +6,7 @@ import {
     DEFAULT_BUILD_ICON, MAX_BUILD_LINES, MIN_BUILD_LINES, MAX_TITLE_LENGTH,
 } from './data.js';
 import * as Dice from './dice.js';
+import * as Init from './initiative.js';
 
 {
     const HISTORY_KEY = 'dnd.history';
@@ -18,6 +19,8 @@ import * as Dice from './dice.js';
     const QUICK_LABEL = 'Quick build';
     const DICE_HASH = 'dice';
     const DICE_KEY = 'dnd.dice';
+    const INIT_HASH = 'initiative';
+    const INIT_KEY = 'dnd.initiative';
 
 
     const $ = (id) => document.getElementById(id);
@@ -169,6 +172,15 @@ import * as Dice from './dice.js';
                 onclick: goToDice,
                 extraClass: 'cat-btn-tool',
             }));
+            items.push(navButton({
+                iconName: 'list-ol',
+                label: 'Initiative',
+                count: initState.combatants.length || undefined,
+                title: 'Track turn order, HP and conditions in combat',
+                current: view && view.type === 'initiative',
+                onclick: goToInitiative,
+                extraClass: 'cat-btn-tool',
+            }));
         }
         fill(els.nav, ...items);
         const currentBtn = els.nav.querySelector('[aria-current="true"]');
@@ -190,6 +202,12 @@ import * as Dice from './dice.js';
         setView({ type: 'combos' });
     }
 
+    function goToInitiative() {
+        if (els.search.value) els.search.value = '';
+        if (location.hash !== '#' + INIT_HASH) history_replace('#' + INIT_HASH);
+        setView({ type: 'initiative' });
+    }
+
     function goToDice() {
         if (els.search.value) els.search.value = '';
         if (location.hash !== '#' + DICE_HASH) history_replace('#' + DICE_HASH);
@@ -201,11 +219,13 @@ import * as Dice from './dice.js';
         const name = decodeURIComponent(location.hash.slice(1));
         if (name === QUICK_HASH) return { type: 'combos' };
         if (name === DICE_HASH) return { type: 'dice' };
+        if (name === INIT_HASH) return { type: 'initiative' };
         return structure.some((c) => c.name === name) ? { type: 'category', name } : null;
     }
 
     function setView(next) {
         view = next;
+        document.body.dataset.view = view.type; // lets CSS adapt per view (e.g. hide the result sheet on phones)
         if (view.type === 'category') lastCategory = view.name;
         renderNav();
         renderContent();
@@ -217,6 +237,7 @@ import * as Dice from './dice.js';
             (view.type === 'category' && structure.some((c) => c.name === view.name)) ||
             view.type === 'combos' ||
             view.type === 'dice' ||
+            view.type === 'initiative' ||
             view.type === 'search');
         if (stillValid) return view;
         if (structure.length) return { type: 'category', name: structure[0].name };
@@ -229,6 +250,7 @@ import * as Dice from './dice.js';
         if (view.type === 'category') renderCategory(view.name);
         else if (view.type === 'combos') renderCombos();
         else if (view.type === 'dice') renderDice();
+        else if (view.type === 'initiative') renderInitiative();
         else if (view.type === 'search') renderSearch(view.q);
         else renderEmpty();
     }
@@ -382,6 +404,245 @@ import * as Dice from './dice.js';
             if (row) row.classList.remove('loading');
             toast('Could not reroll (' + err.message + ')');
         }
+    }
+
+    // ---------- Initiative tracker ----------
+    let initState = (() => {
+        try { return Init.normalizeState(JSON.parse(localStorage.getItem(INIT_KEY))); }
+        catch { return Init.emptyState(); }
+    })();
+    let initKind = 'npc';  // last type chosen in the add form
+    let initUi = null;     // live references into the rendered view
+
+    function saveInit() {
+        try { localStorage.setItem(INIT_KEY, JSON.stringify(initState)); } catch { /* ignore */ }
+    }
+
+    // Apply a state change, save it and redraw the bar and list (the add form keeps its input)
+    function initAction(fn, ...args) {
+        initState = fn(initState, ...args);
+        saveInit();
+        renderInitBar();
+        renderInitList();
+        renderNav();
+    }
+
+    function rollInitiative(mod) {
+        const notation = '1d20' + (mod ? (mod > 0 ? '+' : '') + mod : '');
+        const r = Dice.roll(Dice.parse(notation));
+        return { value: r.total, detail: Dice.describe(notation, r), nat20: r.nat20, nat1: r.nat1 };
+    }
+
+    function renderInitiative() {
+        const bar = el('section', { class: 'dice-card init-bar', 'aria-live': 'polite' });
+        const list = el('section', { class: 'init-list-wrap', 'aria-label': 'Turn order' });
+        els.content.replaceChildren(
+            el('div', { class: 'content-head' },
+                el('div', { class: 'content-kicker', text: 'Tools' }),
+                el('h1', { class: 'content-title', text: 'Initiative' }),
+                el('p', { class: 'content-blurb', text: 'Add your party and the monsters, then step through turns. HP, AC and conditions are tracked for you, and everything is saved in this browser.' })),
+            bar,
+            renderInitForm(),
+            list);
+        initUi = { bar, list };
+        renderInitBar();
+        renderInitList();
+    }
+
+    function renderInitBar() {
+        if (!initUi || view?.type !== 'initiative') return;
+        const { round, activeId, combatants } = initState;
+        const active = combatants.find((c) => c.id === activeId);
+        const started = round > 0;
+        fill(initUi.bar,
+            el('div', { class: 'init-round' },
+                el('span', { class: 'init-round-label', text: started ? 'Round' : 'Combat' }),
+                el('span', { class: 'init-round-value', text: started ? round : 'Not started' })),
+            el('div', { class: 'init-now' }, started && active
+                ? el('span', {}, el('span', { class: 'init-now-label', text: 'Now: ' }), el('strong', { text: active.name }))
+                : el('span', { class: 'init-now-label', text: combatants.length ? 'Ready when you are.' : 'Add combatants below to begin.' })),
+            el('div', { class: 'init-controls' },
+                started ? el('button', {
+                    type: 'button', class: 'btn-outline-gold', title: 'Previous turn', 'aria-label': 'Previous turn',
+                    onclick: () => initAction(Init.prevTurn),
+                }, icon('chevron-left')) : null,
+                el('button', {
+                    type: 'button',
+                    class: 'btn-gold',
+                    disabled: !combatants.length,
+                    title: started ? 'Next turn (N)' : 'Start combat (N)',
+                    onclick: () => initAction(Init.nextTurn),
+                }, icon(started ? 'chevron-right' : 'play-fill'), el('span', { text: started ? 'Next turn' : 'Start combat' })),
+                started ? el('button', {
+                    type: 'button', class: 'btn-outline-gold', title: 'End combat (keeps everyone, resets the round)',
+                    onclick: () => initAction(Init.endCombat),
+                }, icon('stop-fill'), el('span', { class: 'init-hide-sm', text: 'End' })) : null));
+    }
+
+    function renderInitForm() {
+        const field = (label, input, cls = '') => el('label', { class: ('be-field ' + cls).trim() }, el('span', { text: label }), input);
+        const num = (attrs) => el('input', { type: 'number', inputmode: 'numeric', class: 'be-input', ...attrs });
+        const name = el('input', { type: 'text', class: 'be-input', maxlength: Init.LIMITS.maxName, placeholder: 'e.g. Goblin', autocomplete: 'off', required: true });
+        const count = num({ min: 1, max: Init.LIMITS.maxCount, value: 1 });
+        const mod = num({ min: -Init.LIMITS.maxMod, max: Init.LIMITS.maxMod, placeholder: '+0' });
+        const init = num({ min: -Init.LIMITS.maxInit, max: Init.LIMITS.maxInit, placeholder: 'Roll' });
+        const hp = num({ min: 1, max: Init.LIMITS.maxHp, placeholder: '—' });
+        const ac = num({ min: 0, max: 99, placeholder: '—' });
+        const error = el('p', { class: 'dice-error', role: 'alert' });
+        const countField = field('How many', count, 'init-count');
+
+        const kindButtons = [['pc', 'Player', 'person-fill'], ['npc', 'Monster', 'emoji-angry']].map(([value, text, ic]) =>
+            el('button', {
+                type: 'button', class: 'dice-mode-btn', 'data-kind': value,
+                onclick: () => { initKind = value; syncKind(); name.focus(); },
+            }, icon(ic), ' ', text));
+        const syncKind = () => {
+            for (const b of kindButtons) b.setAttribute('aria-pressed', String(b.dataset.kind === initKind));
+            countField.hidden = initKind !== 'npc';
+            name.placeholder = initKind === 'pc' ? 'e.g. Aria' : 'e.g. Goblin';
+            init.placeholder = initKind === 'pc' ? 'Their roll' : 'Roll';
+            init.title = initKind === 'pc' ? 'Type the player\'s roll, or leave blank to roll for them' : 'Leave blank to roll d20 + modifier';
+        };
+
+        const form = el('form', {
+            class: 'dice-card init-form',
+            novalidate: true,
+            onsubmit: (e) => {
+                e.preventDefault();
+                error.textContent = '';
+                const base = name.value.trim();
+                if (!base) { error.textContent = 'Give them a name.'; name.focus(); return; }
+                const room = Init.LIMITS.maxCombatants - initState.combatants.length;
+                const n = initKind === 'npc' ? Math.min(Number(count.value) || 1, Init.LIMITS.maxCount) : 1;
+                if (n > room) { error.textContent = room ? 'Only ' + room + ' more can join (max ' + Init.LIMITS.maxCombatants + ').' : 'The tracker is full (max ' + Init.LIMITS.maxCombatants + ').'; return; }
+                const names = Init.numberedNames(base, n, initState.combatants.map((c) => c.name));
+                const rolled = [];
+                const added = names.map((nm) => {
+                    const c = Init.createCombatant({ name: nm, kind: initKind, mod: mod.value, init: init.value, hp: hp.value, ac: ac.value });
+                    if (c.init === null) { const r = rollInitiative(c.mod); c.init = r.value; rolled.push(r.value); }
+                    return c;
+                });
+                initAction((st) => ({ ...st, combatants: [...st.combatants, ...added] }));
+                const who = added.length > 1 ? added[0].name + '–' + added[added.length - 1].name.replace(base + ' ', '') : added[0].name;
+                toast('Added ' + who + (rolled.length ? ' (rolled ' + rolled.join(', ') + ')' : ''));
+                name.value = ''; init.value = ''; count.value = 1;
+                name.focus();
+            },
+        },
+            el('div', { class: 'init-form-head' },
+                el('h2', { class: 'dice-card-title', text: 'Add to combat' }),
+                el('div', { class: 'dice-mode-row', role: 'group', 'aria-label': 'Type' }, ...kindButtons)),
+            el('div', { class: 'init-form-fields' },
+                field('Name', name, 'init-name-field'),
+                countField,
+                field('Init mod', mod),
+                field('Initiative', init),
+                field('HP', hp),
+                field('AC', ac),
+                el('button', { type: 'submit', class: 'btn-gold init-add' }, icon('plus-lg'), el('span', { text: 'Add' }))),
+            error);
+        syncKind();
+        return form;
+    }
+
+    function renderInitList() {
+        if (!initUi || view?.type !== 'initiative') return;
+        const order = Init.sortOrder(initState.combatants);
+        if (!order.length) {
+            fill(initUi.list, el('p', { class: 'empty-state', text: 'No one in combat yet. Add your party and the monsters above. Leave Initiative blank to roll d20 + modifier.' }));
+            return;
+        }
+        const hasMonsters = order.some((c) => c.kind === 'npc');
+        fill(initUi.list,
+            el('ol', { class: 'init-list' }, ...order.map(renderInitRow)),
+            el('div', { class: 'init-list-actions' },
+                el('span', { class: 'init-hint' }, 'Press ', el('kbd', { text: 'N' }), ' for the next turn'),
+                hasMonsters ? el('button', {
+                    type: 'button', class: 'link-btn', title: 'Remove every monster and reset the round, keeping the party',
+                    onclick: () => initAction((st) => ({ ...Init.endCombat(st), combatants: st.combatants.filter((c) => c.kind === 'pc') })),
+                }, 'Remove monsters') : null,
+                el('button', {
+                    type: 'button', class: 'link-btn',
+                    onclick: () => { if (window.confirm('Remove everyone from the tracker?')) initAction(() => Init.emptyState()); },
+                }, 'Clear all')));
+    }
+
+    function renderInitRow(c) {
+        const active = c.id === initState.activeId;
+        const down = c.maxHp !== null && c.hp <= 0;
+        const update = (fn) => initAction(Init.updateCombatant, c.id, fn);
+
+        const score = el('input', {
+            type: 'number', inputmode: 'numeric', class: 'init-score',
+            'aria-label': 'Initiative for ' + c.name, title: 'Initiative (edit to change the order)',
+            onchange: (e) => update((x) => ({ ...x, init: e.currentTarget.value === '' ? null : Init.createCombatant({ init: e.currentTarget.value }).init })),
+        });
+        score.value = c.init ?? '';
+
+        const reroll = el('button', {
+            type: 'button', class: 'icon-btn init-reroll', title: 'Roll initiative (d20 ' + (c.mod >= 0 ? '+ ' : '− ') + Math.abs(c.mod) + ')',
+            'aria-label': 'Roll initiative for ' + c.name,
+            onclick: () => {
+                const r = rollInitiative(c.mod);
+                update((x) => ({ ...x, init: r.value }));
+                toast(c.name + ': ' + r.detail.replace(/^.*? = /, '') + (r.nat20 ? ' (natural 20!)' : r.nat1 ? ' (natural 1)' : ''));
+            },
+        }, icon('dice-5'));
+
+        const condSelect = el('select', {
+            class: 'init-cond-add', 'aria-label': 'Add a condition to ' + c.name,
+            onchange: (e) => { const v = e.currentTarget.value; if (v) update((x) => Init.toggleCondition(x, v)); },
+        }, el('option', { value: '', text: '+ Condition' }),
+            ...Init.CONDITIONS.filter((x) => !c.conditions.includes(x)).map((x) => el('option', { value: x, text: x })));
+
+        let hpBlock;
+        if (c.maxHp === null) {
+            hpBlock = el('div', { class: 'init-hp init-hp-none' }, el('span', { class: 'init-muted', text: 'HP not tracked' }));
+        } else {
+            const pct = Math.round((c.hp / c.maxHp) * 100);
+            const amount = el('input', { type: 'number', inputmode: 'numeric', min: 1, class: 'init-hp-amount', placeholder: 'Amt', 'aria-label': 'Damage or healing for ' + c.name });
+            const apply = (sign) => {
+                const v = Math.abs(Math.trunc(Number(amount.value)));
+                if (!v) { amount.focus(); return; }
+                update((x) => Init.changeHp(x, sign * v));
+            };
+            hpBlock = el('form', {
+                class: 'init-hp',
+                onsubmit: (e) => { e.preventDefault(); apply(-1); },
+            },
+                el('div', { class: 'init-hp-top' },
+                    el('span', { class: 'init-hp-text' }, el('strong', { text: c.hp }), ' / ' + c.maxHp),
+                    el('div', { class: 'init-hp-bar', role: 'progressbar', 'aria-label': c.name + ' hit points', 'aria-valuemin': 0, 'aria-valuemax': c.maxHp, 'aria-valuenow': c.hp },
+                        el('span', { class: 'init-hp-fill ' + (pct > 50 ? 'is-high' : pct > 25 ? 'is-mid' : 'is-low'), style: 'width:' + pct + '%' }))),
+                el('div', { class: 'init-hp-edit' },
+                    amount,
+                    el('button', { type: 'submit', class: 'init-hp-btn is-dmg', title: 'Damage (Enter)', 'aria-label': 'Damage ' + c.name }, icon('dash-lg')),
+                    el('button', { type: 'button', class: 'init-hp-btn is-heal', title: 'Heal', 'aria-label': 'Heal ' + c.name, onclick: () => apply(1) }, icon('plus-lg'))));
+        }
+
+        return el('li', { class: 'init-row is-' + c.kind + (active ? ' is-active' : '') + (down ? ' is-down' : ''), 'aria-current': active ? 'true' : null },
+            el('div', { class: 'init-left' },
+                el('span', { class: 'init-turn', 'aria-hidden': 'true' }, active ? icon('caret-right-fill') : null),
+                score,
+                reroll),
+            el('div', { class: 'init-main' },
+                el('div', { class: 'init-name-row' },
+                    el('span', { class: 'init-kind', title: c.kind === 'pc' ? 'Player' : 'Monster' }, icon(c.kind === 'pc' ? 'person-fill' : 'emoji-angry')),
+                    el('span', { class: 'init-name', text: c.name }),
+                    c.ac !== null ? el('span', { class: 'init-badge', title: 'Armor Class' }, icon('shield-fill'), ' ' + c.ac) : null,
+                    el('span', { class: 'init-mod', title: 'Initiative modifier', text: (c.mod >= 0 ? '+' : '−') + Math.abs(c.mod) }),
+                    down ? el('span', { class: 'init-down', text: c.kind === 'pc' ? 'Down' : 'Defeated' }) : null),
+                el('div', { class: 'init-conds' },
+                    ...c.conditions.map((x) => el('button', {
+                        type: 'button', class: 'init-cond', title: 'Remove ' + x, 'aria-label': 'Remove ' + x + ' from ' + c.name,
+                        onclick: () => update((y) => Init.toggleCondition(y, x)),
+                    }, x, icon('x'))),
+                    condSelect)),
+            hpBlock,
+            el('button', {
+                type: 'button', class: 'icon-btn init-remove', title: 'Remove ' + c.name, 'aria-label': 'Remove ' + c.name,
+                onclick: () => initAction(Init.removeCombatant, c.id),
+            }, icon('x-lg')));
     }
 
     // ---------- Dice ----------
@@ -1050,6 +1311,9 @@ import * as Dice from './dice.js';
         } else if (e.key.toLowerCase() === 's' && structure.length) {
             e.preventDefault();
             rollRandomTable();
+        } else if (e.key.toLowerCase() === 'n' && view?.type === 'initiative') {
+            e.preventDefault();
+            initAction(Init.nextTurn);
         }
     });
 
@@ -1208,6 +1472,7 @@ import * as Dice from './dice.js';
         if (next.type === 'category') history_replace('#' + encodeURIComponent(next.name));
         else if (next.type === 'combos') history_replace('#' + QUICK_HASH);
         else if (next.type === 'dice') history_replace('#' + DICE_HASH);
+        else if (next.type === 'initiative') history_replace('#' + INIT_HASH);
         setView(next);
     }
 
@@ -1759,6 +2024,7 @@ import * as Dice from './dice.js';
         if (!next) return;
         if (next.type === 'combos') goToCombos();
         else if (next.type === 'dice') goToDice();
+        else if (next.type === 'initiative') goToInitiative();
         else goToCategory(next.name);
     });
 }
