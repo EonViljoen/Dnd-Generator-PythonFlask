@@ -1,5 +1,4 @@
-import os
-from flask import Blueprint, render_template, send_from_directory, redirect, url_for
+from flask import Blueprint, render_template, current_app, send_from_directory
 
 
 main_blueprint = Blueprint('main', __name__)
@@ -14,4 +13,4 @@ def Cards():
 
 @main_blueprint.route('/favicon.ico')
 def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico', MimeTypes='images/favicon.ico')
+    return send_from_directory(current_app.static_folder, 'images/favicon.ico', mimetype='image/png')  # file is a PNG despite the .ico name

@@ -1,13 +1,190 @@
-.stretch-button-95 {
-    @media (max-width:770px) {
-        width: 100%;
-    }
-    width: 75%;
+/* ---------- Layout ---------- */
+body {
+    background: #f4f2ee;
 }
 
-.stretch-button-full {
-    @media (max-width:770px) {
-        width: 100%;
+.app-header {
+    background: #212529;
+    color: #f8f9fa;
+    padding: 0.85rem 0;
+}
+
+/* Masonry-style columns so uneven cards pack without gaps */
+.category-columns {
+    column-count: 1;
+    column-gap: 1.25rem;
+}
+@media (min-width: 768px) {
+    .category-columns { column-count: 2; }
+}
+.category-card {
+    break-inside: avoid;
+    margin-bottom: 1.25rem;
+}
+.category-card .card-header {
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Sub-category rows: roll button + list button */
+.sub-row {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.3rem 0;
+}
+.sub-row + .sub-row {
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.btn-roll {
+    flex: 1;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+.btn-roll .count {
+    font-size: 0.75rem;
+    opacity: 0.6;
+    white-space: nowrap;
+}
+.btn-roll.active {
+    background: #212529;
+    color: #fff;
+}
+
+/* ---------- Result panel ---------- */
+.result-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.result-crumb {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6c757d;
+}
+.result-text {
+    font-size: 1.15rem;
+    line-height: 1.55;
+    margin: 0 0 1rem;
+    white-space: pre-line;
+    transition: opacity 0.15s;
+}
+.result-panel.loading .result-text {
+    opacity: 0.35;
+}
+.result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+/* ---------- Pinned / history ---------- */
+.side-list {
+    margin-top: 1.5rem;
+}
+.side-list-title {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+.side-list-empty {
+    font-size: 0.85rem;
+    color: #868e96;
+    margin: 0;
+}
+.side-item {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.6rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.875rem;
+}
+.side-item-body {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+.side-item-crumb {
+    display: block;
+    font-size: 0.7rem;
+    color: #868e96;
+}
+.side-item-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.side-item .btn {
+    padding: 0 0.25rem;
+    line-height: 1.2;
+}
+
+/* ---------- Entries modal ---------- */
+.entries-list li {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.entries-list li::marker {
+    color: #868e96;
+    font-size: 0.85em;
+}
+
+/* ---------- Desktop: sticky sidebar ---------- */
+@media (min-width: 992px) {
+    .sidebar {
+        position: sticky;
+        top: 1rem;
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
     }
-    width: 97.5%;
+}
+
+/* ---------- Mobile: result panel docks to the bottom ---------- */
+@media (max-width: 991.98px) {
+    body {
+        padding-bottom: 45vh;
+    }
+    .result-panel {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1030;
+        border-radius: 0.75rem 0.75rem 0 0;
+        box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15) !important;
+    }
+    .result-scroll {
+        max-height: 28vh;
+        overflow-y: auto;
+    }
+    .result-panel.collapsed .result-scroll,
+    .result-panel.collapsed .result-actions {
+        display: none;
+    }
+    .result-panel.collapsed .result-meta {
+        margin-bottom: 0;
+    }
+    .result-collapse i {
+        display: inline-block;
+        transition: transform 0.15s;
+    }
+    .result-panel.collapsed .result-collapse i {
+        transform: rotate(180deg);
+    }
+    body.result-collapsed {
+        padding-bottom: 4rem;
+    }
 }

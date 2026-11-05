@@ -6154,7 +6154,6 @@
       "The Negahorse: Horse-shaped hole in the universe, filled with stars and inky blackness. Wears an insulated saddle to prevent frostbiter of the rider. Immune to non-magical damage, does not tire, and is capable of running to any named location she has previously visited. Possesses an uncontrollable urge to collide with a regular horse. If this happens, both horses are annihilated in an explosion that does d12 damage to all in 20', gives a random mutation (save negates) to all in 100', and kills all horses in a ten mile radius. It is sold with a hood, so that you can throw it over the Negahorse's head when it catches sight of another horse. (This is the only method the previous owners have had success with, as the negahorse is a powerful runner and jumper. They do not realize how dangerous an horse - antihorse collision would be.)"
     ],
     "Mutations" : [
-      "0-32: Bad",
       "Roll twice from bad table",
       "Your skin becomes pale and your eyes become a lighter hue. Gain sunlight sensitivity.",
       "Your skin becomes slightly magnetic. Gain lightning weakness",
@@ -6188,7 +6187,6 @@
       "You've lost part of your knowledge to the pool. You lose proficiency in two random skills.",
       "Your body is now like a volcano close to eruption. Everytime they hurt you, boiling blood rushes out violently, casting flaming hands on you and in 3 tiles perpendicular to your attacker.",
       "you smell really bad. Most creatures don't find you appetising, but you have disadvantage on persuasion and intimidation checks.",
-      "33-65: Average",
       "You grow a third eye in the back of your neck. You can't see through it.",
       "You reroll your race.",
       "When you gesture with your hands, small yellow sparks float in the air.",
@@ -6222,7 +6220,7 @@
       "Diving in this thing was so cool. You should take risks more often. +5 initiative.",
       "You have grown a tail. (1d4 small piglike, long cat/apelike, thick reptile like, round bunny like)",
       "During your dive you discover a race you had never seen before, a pact made by beings who now rule as gods, and more. It will take time for you to unravel the truth but you'll get there. At the end of each session you may ask a single world lore question to the dm and/or he may tell you a single relevant fact about it. Always subject to dm discretion.",
-      "66-98: Good 66 - You grow a third eye on the back of your neck. You can see through it, no dark vision.",
+      "You grow a third eye on the back of your neck. You can see through it, no dark vision.",
       "Your eyes become used to darkness. You gain 60 extra ft of darkvision.",
       "Your feet and hands gain retractable webbing. You gain a swim speed of 30 ft.",
       "You can secrete a strange sticky substance from your skin. You gain a climb speed of 30ft.",
