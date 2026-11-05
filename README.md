@@ -38,7 +38,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 
 ## Features
 
-**10,514 prompts** across **108 tables** in **7 categories**, from riddles and deadly traps to tavern names and an ogre's pocket contents.
+**10,414 prompts** across **108 tables** in **7 categories**, from riddles and deadly traps to tavern names and an ogre's pocket contents.
 
 | | |
 |---|---|
@@ -238,7 +238,7 @@ To add prompts, add entries to an existing table, or add a new table or category
 |----------|-------:|--------:|-------|
 | 🧱 Dungeon | 7 | 533 | Puzzles, traps, riddles and hidden doors for when the party heads underground. |
 | 🛡️ Encounter | 8 | 800 | Things the party runs into on the road, sorted by terrain. |
-| 💎 Items | 29 | 2,958 | Trinkets, treasures, potions and pocket contents, useful or otherwise. |
+| 💎 Items | 29 | 2,858 | Trinkets, treasures, potions and pocket contents, useful or otherwise. |
 | ✨ Misc | 23 | 2,298 | Curses, diseases, plot twists, boons and other improvised flair. |
 | 👥 NPCs | 16 | 1,525 | "Who's that?" Shopkeepers, villains, familiars and their secrets. |
 | 🗺️ Quests | 9 | 895 | Hooks, side quests and travel events for when the party goes off-script. |
