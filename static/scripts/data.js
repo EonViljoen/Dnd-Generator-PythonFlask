@@ -91,6 +91,52 @@ export const customData = {
     clear: () => storage.del(CUSTOM_KEY),
 };
 
+// ---------- User-made Quick builds ----------
+// Stored under one key as an ordered array:
+//   [{ id, title, icon, parts: [{ label, category, sub }], createdAt, updatedAt }]
+// Parts use the same shape as the built-in builds from /api/combos.
+const BUILDS_KEY = 'builds';
+export const DEFAULT_BUILD_ICON = 'lightning-charge';
+export const MAX_BUILD_LINES = 12;
+export const MIN_BUILD_LINES = 2;
+export const MAX_TITLE_LENGTH = 60;
+
+const isText = (v) => typeof v === 'string' && v.trim() !== '';
+
+function cleanBuild(b) {
+    if (!isPlainObject(b) || !isText(b.id) || !isText(b.title) || !Array.isArray(b.parts)) return null;
+    const parts = b.parts
+        .filter((p) => isPlainObject(p) && isText(p.label) && isText(p.category) && isText(p.sub))
+        .slice(0, MAX_BUILD_LINES)
+        .map((p) => ({ label: p.label.trim(), category: p.category, sub: p.sub }));
+    if (!parts.length) return null;
+    return {
+        id: b.id,
+        title: b.title.trim().slice(0, MAX_TITLE_LENGTH),
+        icon: ICON_SET.has(b.icon) ? b.icon : DEFAULT_BUILD_ICON,
+        parts,
+        createdAt: b.createdAt || null,
+        updatedAt: b.updatedAt || null,
+    };
+}
+
+export const userBuilds = {
+    async load() {
+        try {
+            const raw = await storage.get(BUILDS_KEY);
+            return Array.isArray(raw) ? raw.map(cleanBuild).filter(Boolean) : [];
+        } catch {
+            return [];
+        }
+    },
+    async save(builds) {
+        await storage.set(BUILDS_KEY, builds);
+        try { await navigator.storage?.persist?.(); } catch { /* ignore */ }
+    },
+};
+
+export const newBuildId = () => 'u-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
 export class ValidationError extends Error {
     constructor(issues) {
         super(issues[0]);

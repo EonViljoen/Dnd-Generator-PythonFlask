@@ -73,7 +73,7 @@
       <!-- Quick builds -->
       <section class="home-section">
         <h2 class="home-heading">Quick builds</h2>
-        <p class="home-sub">Roll several tables at once, then reroll any line you don't like.</p>
+        <p class="home-sub">Roll several tables at once, then reroll any line you don't like. Or build your own from any tables, including yours.</p>
         <div class="combo-grid">
           {% for combo in combos %}
           <a class="combo-card combo-link" href="{{ url_for('main.Cards') }}#quick-builds">
@@ -101,6 +101,11 @@
             <p>Hide any table or whole category you don't need. Hidden tables also drop out of search, Surprise me and Quick builds.</p>
           </article>
           <article class="custom-card">
+            <span class="combo-icon"><i class="bi bi-lightning-charge" aria-hidden="true"></i></span>
+            <h3>Make your own Quick builds</h3>
+            <p>Pick the tables you always roll together, name each line and choose an icon. Start from scratch or copy a built-in build and tweak it.</p>
+          </article>
+          <article class="custom-card">
             <span class="combo-icon"><i class="bi bi-file-earmark-code" aria-hidden="true"></i></span>
             <h3>Bring your own tables</h3>
             <p>Load a JSON file with your homebrew tables. Add them alongside the built-in ones, or replace the defaults entirely.</p>
@@ -116,7 +121,7 @@
           <article class="custom-card">
             <span class="combo-icon"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
             <h3>Stays on your device</h3>
-            <p>Your file is checked and saved in this browser only. It's never uploaded, so nobody else sees it. Export a copy to use it on another device.</p>
+            <p>Your file and builds are saved in this browser only. They're never uploaded, so nobody else sees them. Export your file to use it on another device.</p>
           </article>
         </div>
         <div class="hero-ctas custom-ctas">

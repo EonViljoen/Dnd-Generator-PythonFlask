@@ -46,6 +46,7 @@ On the generator page, **Customize** lets each user tailor the tables without ch
 - **Show or hide tables**: tick the tables you want on `/cards`. Stored in the browser's localStorage.
 - **Load your own JSON** (same structure as above), either *added to the defaults* (new tables are added, entries for an existing table are appended) or *replacing the defaults*. The file is validated in the browser and stored in IndexedDB. It is never sent to the server, so rolling, searching and Quick builds run in the browser while custom data is active.
 - **Download the defaults as a template** (`/api/getall`), **Export** your file, or **Remove** it to go back to the built-in tables.
+- **Make your own Quick builds** from the Quick builds view: name it, pick an icon, and add lines (a label plus a category and table). Copy a built-in build to start from it. Builds are stored in IndexedDB as `[{ id, title, icon, parts: [{ label, category, sub }] }]`, the same part shape as `/api/combos`.
 
 Because the data lives in that browser only, it doesn't sync between devices and is lost if site data is cleared. Export keeps a copy.
 

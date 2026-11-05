@@ -1,7 +1,8 @@
 // D&D Prompt Helper – cards page (ES module)
 import {
     api, customData, createSource, parseCustomJson, ValidationError, downloadJson, MAX_FILE_BYTES,
-    ICON_CHOICES, iconFor,
+    ICON_CHOICES, iconFor, userBuilds, newBuildId,
+    DEFAULT_BUILD_ICON, MAX_BUILD_LINES, MIN_BUILD_LINES, MAX_TITLE_LENGTH,
 } from './data.js';
 
 {
@@ -49,7 +50,9 @@ import {
     let custom = null;        // stored custom JSON record, or null
     let allStructure = [];    // every table in the active source
     let structure = [];       // visible tables only (hidden ones removed)
-    let recipes = [];         // quick build recipes from the server
+    let serverRecipes = [];   // built-in quick builds from the server
+    let builds = [];          // the user's own quick builds (IndexedDB)
+    let recipes = [];         // built-in + own builds
     let combos = [];          // recipes limited to parts whose tables are available
     let view = null;          // { type: 'category', name } | { type: 'combos' } | { type: 'search', q }
     let lastCategory = null;
@@ -137,13 +140,13 @@ import {
             current: view && view.type === 'category' && view.name === cat.name,
             onclick: () => goToCategory(cat.name),
         }));
-        if (combos.length) {
+        {
             items.push(el('li', { class: 'cat-nav-sep', 'aria-hidden': 'true' }));
             items.push(navButton({
                 iconName: 'lightning-charge',
                 label: 'Quick builds',
-                count: combos.length,
-                title: 'Roll several tables at once',
+                count: combos.filter(isRollable).length,
+                title: 'Roll several tables at once, or make your own',
                 current: view && view.type === 'combos',
                 onclick: goToCombos,
                 extraClass: 'cat-btn-quick',
@@ -172,7 +175,7 @@ import {
     // View named by the URL hash, or null if it doesn't match anything
     function viewFromHash() {
         const name = decodeURIComponent(location.hash.slice(1));
-        if (name === QUICK_HASH && combos.length) return { type: 'combos' };
+        if (name === QUICK_HASH) return { type: 'combos' };
         return structure.some((c) => c.name === name) ? { type: 'category', name } : null;
     }
 
@@ -187,11 +190,11 @@ import {
     function fallbackView() {
         const stillValid = view && (
             (view.type === 'category' && structure.some((c) => c.name === view.name)) ||
-            (view.type === 'combos' && combos.length) ||
+            view.type === 'combos' ||
             view.type === 'search');
         if (stillValid) return view;
         if (structure.length) return { type: 'category', name: structure[0].name };
-        if (combos.length) return { type: 'combos' };
+        if (builds.length) return { type: 'combos' };
         return { type: 'empty' };
     }
 
@@ -257,28 +260,53 @@ import {
     }
 
     // ---------- Quick builds ----------
+    const isRollable = (combo) => combo.parts.length >= MIN_BUILD_LINES;
+
     function renderCombos() {
+        const builtIn = combos.filter((c) => !c.own);
+        const own = combos.filter((c) => c.own);
         els.content.replaceChildren(
-            el('div', { class: 'content-head' },
-                el('div', { class: 'content-kicker', text: plural(combos.length, 'generator') }),
-                el('h1', { class: 'content-title', text: 'Quick builds' }),
-                el('p', { class: 'content-blurb', text: 'Roll several tables at once for a ready-to-use NPC, tavern, town and more. Reroll any single line you don’t like.' })),
-            el('div', { class: 'combo-grid' }, ...combos.map(renderComboCard)));
+            el('div', { class: 'content-head content-head-split' },
+                el('div', {},
+                    el('div', { class: 'content-kicker', text: plural(combos.filter(isRollable).length, 'generator') }),
+                    el('h1', { class: 'content-title', text: 'Quick builds' }),
+                    el('p', { class: 'content-blurb', text: 'Roll several tables at once for a ready-to-use NPC, tavern, town and more. Reroll any single line you don’t like, or make your own builds.' })),
+                el('button', { type: 'button', class: 'btn-outline-gold', onclick: () => openBuilder() },
+                    icon('plus-lg'), el('span', { text: 'New build' }))),
+            el('h2', { class: 'section-label', text: 'Your builds' + (own.length ? ' (' + own.length + ')' : '') }),
+            el('div', { class: 'combo-grid' },
+                ...own.map(renderComboCard),
+                el('button', { type: 'button', class: 'combo-card combo-new', onclick: () => openBuilder() },
+                    el('span', { class: 'combo-icon' }, icon('plus-lg')),
+                    el('span', { class: 'combo-title', text: 'New build' }),
+                    el('span', { class: 'combo-blurb', text: own.length ? 'Pick tables to roll together.' : 'Pick the tables you always roll together, like a shopkeeper’s name, wares and quirk.' }))),
+            builtIn.length ? el('h2', { class: 'section-label', text: 'Built-in' }) : null,
+            builtIn.length ? el('div', { class: 'combo-grid' }, ...builtIn.map(renderComboCard)) : null);
     }
 
     function renderComboCard(combo) {
-        return el('article', { class: 'combo-card' + (activeKey === 'combo|' + combo.id ? ' active' : ''), 'data-key': 'combo|' + combo.id },
+        const skipped = combo.totalParts - combo.parts.length;
+        const rollable = isRollable(combo);
+        return el('article', { class: 'combo-card' + (activeKey === 'combo|' + combo.id ? ' active' : '') + (rollable ? '' : ' is-disabled'), 'data-key': 'combo|' + combo.id },
             el('div', { class: 'combo-head' },
                 el('span', { class: 'combo-icon' }, icon(combo.icon)),
-                el('h2', { class: 'combo-title', text: combo.title })),
-            el('p', { class: 'combo-blurb', text: combo.blurb }),
+                el('h2', { class: 'combo-title', text: combo.title }),
+                combo.own ? el('span', { class: 'combo-badge', text: 'Yours' }) : null),
+            combo.blurb ? el('p', { class: 'combo-blurb', text: combo.blurb }) : null,
             el('ul', { class: 'combo-parts' }, ...combo.parts.map((p) =>
                 el('li', { title: p.category + ' › ' + p.sub, text: p.label }))),
-            el('button', {
-                type: 'button',
-                class: 'btn-gold',
-                onclick: () => rollCombo(combo.id),
-            }, icon('dice-5'), el('span', { text: 'Roll ' + combo.title.replace(/^Quick /, '') })));
+            skipped ? el('p', { class: 'combo-warn' }, icon('exclamation-triangle'),
+                ' ' + plural(skipped, 'line') + ' skipped: table hidden or missing' + (rollable ? '' : '. Needs at least ' + MIN_BUILD_LINES + ' available.')) : null,
+            el('div', { class: 'combo-actions' },
+                el('button', {
+                    type: 'button',
+                    class: 'btn-gold',
+                    disabled: !rollable,
+                    onclick: () => rollCombo(combo.id),
+                }, icon('dice-5'), el('span', { text: 'Roll ' + combo.title.replace(/^Quick /, '') })),
+                combo.own
+                    ? el('button', { type: 'button', class: 'icon-btn', title: 'Edit ' + combo.title, 'aria-label': 'Edit ' + combo.title, onclick: () => openBuilder(combo.id) }, icon('pencil'))
+                    : el('button', { type: 'button', class: 'icon-btn', title: 'Make your own version of ' + combo.title, 'aria-label': 'Make your own version of ' + combo.title, onclick: () => copyBuiltIn(combo.id) }, icon('copy'))));
     }
 
     const comboText = (parts) => parts.map((p) => p.label + ': ' + p.text).join('\n\n');
@@ -294,7 +322,7 @@ import {
         startRolling();
         try {
             const combo = combos.find((c) => c.id === id);
-            if (!combo) throw new Error('not available');
+            if (!combo || !isRollable(combo)) throw new Error('not available');
             const texts = await Promise.all(combo.parts.map((p) => source.roll(p.category, p.sub)));
             if (seq !== rollSeq) return;
             const parts = combo.parts.map((p, i) => ({ ...p, text: texts[i] }));
@@ -689,9 +717,12 @@ import {
             })
             .filter((cat) => cat.subcategories.length);
         const available = new Set(structure.flatMap((c) => c.subcategories.map((s) => keyOf(c.name, s.name))));
+        recipes = [...builds.map((b) => ({ ...b, own: true, blurb: '' })), ...serverRecipes];
         combos = recipes
-            .map((r) => ({ ...r, parts: r.parts.filter((p) => available.has(keyOf(p.category, p.sub))) }))
-            .filter((r) => r.parts.length >= 2); // one line isn't much of a "build"
+            .map((r) => ({ ...r, totalParts: r.parts.length, parts: r.parts.filter((p) => available.has(keyOf(p.category, p.sub))) }))
+            // Built-ins need 2+ available lines (one line isn't much of a "build"); own builds always
+            // show so they can be fixed, but can't be rolled until they have enough lines.
+            .filter((r) => r.own || isRollable(r));
         els.surprise.disabled = !structure.length;
     }
 
@@ -788,11 +819,23 @@ import {
 
     // ---------- Category icon picker ----------
     let openPicker = null; // category whose picker is expanded
+    const iconLabel = (name) => name.replace(/-/g, ' ');
+
+    // Grid of selectable icons (shared by category icons and the build editor)
+    function iconGrid(currentIcon, onPick) {
+        return el('div', { class: 'cz-icon-grid' }, ...ICON_CHOICES.map((name) => el('button', {
+            type: 'button',
+            class: 'cz-icon-option' + (name === currentIcon ? ' is-selected' : ''),
+            title: iconLabel(name),
+            'aria-label': iconLabel(name),
+            'aria-pressed': String(name === currentIcon),
+            onclick: () => onPick(name),
+        }, icon(name))));
+    }
 
     function renderIcons() {
         cz.iconsSection.hidden = !custom;
         if (!custom) { cz.icons.replaceChildren(); return; }
-        const label = (name) => name.replace(/-/g, ' ');
         cz.icons.replaceChildren(...Object.keys(custom.data).map((cat) => {
             const currentIcon = iconFor(cat, custom, serverStructure);
             const picked = !!custom.icons?.[cat];
@@ -811,14 +854,7 @@ import {
                     el('span', { class: 'cz-icon-name', text: cat }),
                     el('span', { class: 'cz-icon-change', text: isOpen ? 'Done' : 'Change' })),
                 isOpen ? el('div', { class: 'cz-icon-picker', id: pickerId, role: 'group', 'aria-label': 'Icons for ' + cat },
-                    el('div', { class: 'cz-icon-grid' }, ...ICON_CHOICES.map((name) => el('button', {
-                        type: 'button',
-                        class: 'cz-icon-option' + (name === currentIcon ? ' is-selected' : ''),
-                        title: label(name),
-                        'aria-label': label(name),
-                        'aria-pressed': String(name === currentIcon),
-                        onclick: () => setCategoryIcon(cat, name),
-                    }, icon(name)))),
+                    iconGrid(currentIcon, (name) => setCategoryIcon(cat, name)),
                     picked ? el('button', { type: 'button', class: 'link-btn', onclick: () => setCategoryIcon(cat, null), text: 'Use the default icon' }) : null)
                     : null);
         }));
@@ -979,13 +1015,252 @@ import {
     cz.showAll.addEventListener('click', () => setHidden(allKeys(), false));
     cz.hideAll.addEventListener('click', () => setHidden(allKeys(), true));
 
+    // ---------- Build editor ----------
+    const be = {
+        modalEl: $('buildModal'),
+        form: $('build-form'),
+        heading: $('buildModalLabel'),
+        title: $('be-title'),
+        iconBtn: $('be-icon-btn'),
+        swatch: $('be-icon-swatch'),
+        picker: $('be-icon-picker'),
+        lines: $('be-lines'),
+        add: $('be-add'),
+        messages: $('be-messages'),
+        del: $('be-delete'),
+    };
+    const beModal = new bootstrap.Modal(be.modalEl);
+    let draft = null; // { id | null, title, icon, parts: [{ label, category, sub }] }
+
+    const categoryByName = (name) => allStructure.find((c) => c.name === name);
+    function defaultTable(category) {
+        const cat = categoryByName(category) || structure[0] || allStructure[0];
+        return cat ? { category: cat.name, sub: cat.subcategories[0].name } : { category: '', sub: '' };
+    }
+
+    function openBuilder(id = null, template = null) {
+        const existing = id ? builds.find((b) => b.id === id) : null;
+        const base = existing || template;
+        draft = base
+            ? { id: existing ? existing.id : null, title: base.title, icon: base.icon || DEFAULT_BUILD_ICON, parts: base.parts.map((p) => ({ ...p })) }
+            : { id: null, title: '', icon: DEFAULT_BUILD_ICON, parts: [{ label: '', ...defaultTable() }, { label: '', ...defaultTable() }] };
+        be.heading.textContent = existing ? 'Edit build' : 'New build';
+        be.title.value = draft.title;
+        be.del.hidden = !existing;
+        be.messages.replaceChildren();
+        setPickerOpen(false);
+        renderDraftIcon();
+        renderLines();
+        beModal.show();
+    }
+
+    function copyBuiltIn(id) {
+        const recipe = serverRecipes.find((r) => r.id === id);
+        if (recipe) openBuilder(null, { title: 'My ' + recipe.title.replace(/^Quick /, ''), icon: recipe.icon, parts: recipe.parts });
+    }
+
+    be.modalEl.addEventListener('shown.bs.modal', () => {
+        if (!draft.title && window.matchMedia('(pointer: fine)').matches) be.title.focus();
+    });
+
+    // Icon
+    function setPickerOpen(open) {
+        be.picker.hidden = !open;
+        be.iconBtn.setAttribute('aria-expanded', String(open));
+        if (open) be.picker.replaceChildren(iconGrid(draft.icon, pickDraftIcon));
+    }
+    function renderDraftIcon() {
+        be.swatch.replaceChildren(icon(draft.icon));
+        if (!be.picker.hidden) be.picker.replaceChildren(iconGrid(draft.icon, pickDraftIcon));
+    }
+    function pickDraftIcon(name) {
+        draft.icon = name;
+        renderDraftIcon();
+    }
+    be.iconBtn.addEventListener('click', () => setPickerOpen(be.picker.hidden));
+    be.title.addEventListener('input', () => { draft.title = be.title.value; });
+
+    // Lines
+    function tableStatus(p) {
+        const cat = categoryByName(p.category);
+        if (!cat || !cat.subcategories.some((s) => s.name === p.sub)) return 'missing';
+        if (hidden.has(keyOf(p.category, p.sub))) return 'hidden';
+        return 'ok';
+    }
+
+    function options(select, values, selected, describe) {
+        for (const value of values) {
+            const opt = el('option', { value, text: value + describe(value) });
+            opt.selected = value === selected;
+            select.append(opt);
+        }
+    }
+
+    function renderLines() {
+        be.lines.replaceChildren(...draft.parts.map((p, i) => renderLine(p, i)));
+        be.add.disabled = draft.parts.length >= MAX_BUILD_LINES;
+        be.add.title = be.add.disabled ? 'Up to ' + MAX_BUILD_LINES + ' lines' : '';
+    }
+
+    function replaceLine(i) {
+        be.lines.children[i].replaceWith(renderLine(draft.parts[i], i));
+    }
+
+    function renderLine(p, i) {
+        const n = draft.parts.length;
+        const lineNo = i + 1;
+
+        const catSelect = el('select', {
+            class: 'be-input',
+            'aria-label': 'Category for line ' + lineNo,
+            onchange: (e) => {
+                Object.assign(p, defaultTable(e.currentTarget.value));
+                replaceLine(i);
+                be.lines.children[i].querySelectorAll('select')[1].focus();
+            },
+        });
+        const catNames = allStructure.map((c) => c.name);
+        if (p.category && !catNames.includes(p.category)) catNames.unshift(p.category);
+        options(catSelect, catNames, p.category, (name) => (categoryByName(name) ? '' : ' (missing)'));
+
+        const tableSelect = el('select', {
+            class: 'be-input',
+            'aria-label': 'Table for line ' + lineNo,
+            onchange: (e) => {
+                p.sub = e.currentTarget.value;
+                replaceLine(i);
+                be.lines.children[i].querySelectorAll('select')[1].focus();
+            },
+        });
+        const subNames = (categoryByName(p.category)?.subcategories || []).map((s) => s.name);
+        if (p.sub && !subNames.includes(p.sub)) subNames.unshift(p.sub);
+        options(tableSelect, subNames, p.sub, (name) => {
+            if (!categoryByName(p.category)?.subcategories.some((s) => s.name === name)) return ' (missing)';
+            return hidden.has(keyOf(p.category, name)) ? ' (hidden)' : '';
+        });
+
+        const labelInput = el('input', {
+            type: 'text',
+            class: 'be-input',
+            maxlength: 40,
+            placeholder: p.sub || 'Label',
+            'aria-label': 'Label for line ' + lineNo,
+            oninput: (e) => { p.label = e.currentTarget.value; },
+        });
+        labelInput.value = p.label;
+
+        const tool = (iconName, label, disabled, run) => el('button', {
+            type: 'button', class: 'icon-btn', title: label, 'aria-label': label + ' (line ' + lineNo + ')', disabled, onclick: run,
+        }, icon(iconName));
+
+        const status = tableStatus(p);
+        return el('li', { class: 'be-line' + (status === 'ok' ? '' : ' has-warning') },
+            el('span', { class: 'be-line-no', text: lineNo }),
+            el('div', { class: 'be-line-main' },
+                el('div', { class: 'be-line-fields' },
+                    el('label', { class: 'be-field' }, el('span', { text: 'Label' }), labelInput),
+                    el('label', { class: 'be-field' }, el('span', { text: 'Category' }), catSelect),
+                    el('label', { class: 'be-field' }, el('span', { text: 'Table' }), tableSelect)),
+                status === 'ok' ? null : el('p', { class: 'be-line-warn' }, icon('exclamation-triangle'),
+                    status === 'hidden'
+                        ? ' This table is hidden, so the line is skipped until you show it again.'
+                        : ' This table isn’t in your current tables, so the line is skipped.')),
+            el('div', { class: 'be-line-tools' },
+                tool('arrow-up', 'Move up', i === 0, () => moveLine(i, -1)),
+                tool('arrow-down', 'Move down', i === n - 1, () => moveLine(i, 1)),
+                tool('x-lg', 'Remove', n <= 1, () => removeLine(i))));
+    }
+
+    function moveLine(i, delta) {
+        const j = i + delta;
+        [draft.parts[i], draft.parts[j]] = [draft.parts[j], draft.parts[i]];
+        renderLines();
+        const btn = be.lines.children[j].querySelector(delta < 0 ? '[title="Move up"]' : '[title="Move down"]');
+        (btn && !btn.disabled ? btn : be.lines.children[j].querySelector('input')).focus();
+    }
+
+    function removeLine(i) {
+        draft.parts.splice(i, 1);
+        renderLines();
+        const row = be.lines.children[Math.min(i, draft.parts.length - 1)];
+        if (row) row.querySelector('input').focus();
+    }
+
+    be.add.addEventListener('click', () => {
+        if (draft.parts.length >= MAX_BUILD_LINES) return;
+        const last = draft.parts[draft.parts.length - 1];
+        draft.parts.push({ label: '', ...defaultTable(last?.category) });
+        renderLines();
+        be.lines.lastElementChild.querySelector('input').focus();
+    });
+
+    function showBuildMessages(kind, title, lines = []) {
+        be.messages.replaceChildren(
+            el('div', { class: 'cz-msg cz-msg-' + kind },
+                el('strong', { text: title }),
+                lines.length ? el('ul', {}, ...lines.map((l) => el('li', { text: l }))) : null));
+    }
+
+    async function saveBuilds(next) {
+        try {
+            await userBuilds.save(next);
+        } catch (err) {
+            showBuildMessages('error', 'Could not save your builds in this browser.', [err.message || String(err)]);
+            return false;
+        }
+        builds = next;
+        recomputeVisible();
+        return true;
+    }
+
+    be.form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const title = be.title.value.trim();
+        const issues = [];
+        if (!title) issues.push('Give the build a name.');
+        if (draft.parts.length < MIN_BUILD_LINES) issues.push('Add at least ' + MIN_BUILD_LINES + ' lines.');
+        if (draft.parts.some((p) => !p.category || !p.sub)) issues.push('Pick a table for every line.');
+        if (issues.length) {
+            showBuildMessages('error', 'Almost there:', issues);
+            if (!title) be.title.focus();
+            return;
+        }
+        const now = new Date().toISOString();
+        const existing = draft.id ? builds.find((b) => b.id === draft.id) : null;
+        const record = {
+            id: existing ? existing.id : newBuildId(),
+            title: title.slice(0, MAX_TITLE_LENGTH),
+            icon: draft.icon,
+            parts: draft.parts.map((p) => ({ label: (p.label.trim() || p.sub).slice(0, 40), category: p.category, sub: p.sub })),
+            createdAt: existing?.createdAt || now,
+            updatedAt: now,
+        };
+        const next = existing ? builds.map((b) => (b.id === record.id ? record : b)) : [...builds, record];
+        if (!(await saveBuilds(next))) return;
+        beModal.hide();
+        activeKey = 'combo|' + record.id;
+        goToCombos();
+        toast(existing ? 'Saved “' + record.title + '”' : 'Created “' + record.title + '”');
+    });
+
+    be.del.addEventListener('click', async () => {
+        const existing = draft?.id && builds.find((b) => b.id === draft.id);
+        if (!existing) return;
+        if (!window.confirm('Delete “' + existing.title + '”? This can’t be undone.')) return;
+        if (!(await saveBuilds(builds.filter((b) => b.id !== existing.id)))) return;
+        beModal.hide();
+        goToCombos();
+        toast('Deleted “' + existing.title + '”');
+    });
+
     // ---------- Init ----------
     renderPins();
     renderHistory();
     Promise.all([api(['structure']), api(['combos']).catch(() => [])])
         .then(async ([data, comboList]) => {
             serverStructure = data;
-            recipes = comboList;
+            serverRecipes = comboList;
+            builds = await userBuilds.load();
             try {
                 await loadSource();
             } catch (err) {

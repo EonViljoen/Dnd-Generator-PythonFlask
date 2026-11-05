@@ -182,6 +182,50 @@
       </div>
     </div>
 
+    <!-- Build editor modal -->
+    <div class="modal fade" id="buildModal" tabindex="-1" aria-labelledby="buildModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <form class="modal-content" id="build-form" novalidate>
+          <div class="modal-header">
+            <div class="flex-grow-1">
+              <div class="modal-kicker">Quick build</div>
+              <h5 class="modal-title" id="buildModalLabel">New build</h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body be">
+            <div class="be-top">
+              <button type="button" class="be-icon-btn" id="be-icon-btn" aria-expanded="false" aria-controls="be-icon-picker" title="Choose an icon">
+                <span class="cz-icon-swatch" id="be-icon-swatch"></span>
+                <span class="be-icon-hint">Icon</span>
+              </button>
+              <label class="be-field be-title-field">
+                <span>Name</span>
+                <input type="text" id="be-title" class="be-input" maxlength="60" placeholder="e.g. Tavern Regular" autocomplete="off">
+              </label>
+            </div>
+            <div id="be-icon-picker" class="cz-icon-picker be-icon-picker" hidden></div>
+
+            <h6 class="cz-heading be-lines-heading"><i class="bi bi-list-ol"></i> Lines</h6>
+            <p class="cz-sub">Each line rolls one table. The label is what you'll see next to the result, and you can use the same table more than once.</p>
+            <ol id="be-lines" class="be-lines"></ol>
+            <button type="button" class="btn-outline-gold btn-sm-gold" id="be-add">
+              <i class="bi bi-plus-lg"></i> Add line
+            </button>
+            <div id="be-messages" class="cz-messages" aria-live="polite"></div>
+          </div>
+          <div class="modal-footer be-footer">
+            <button type="button" class="btn-outline-danger-ink btn-sm-gold" id="be-delete" hidden>
+              <i class="bi bi-trash"></i> Delete
+            </button>
+            <span class="flex-grow-1"></span>
+            <button type="button" class="btn-outline-gold" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn-gold"><i class="bi bi-check-lg"></i> Save build</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="copy-toast" id="copy-toast" role="status" aria-live="polite"></div>
 
 {% endblock %}
