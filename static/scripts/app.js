@@ -4,6 +4,7 @@ import {
     ICON_CHOICES, iconFor, userBuilds, newBuildId,
     DEFAULT_BUILD_ICON, MAX_BUILD_LINES, MIN_BUILD_LINES, MAX_TITLE_LENGTH,
 } from './data.js';
+import * as Dice from './dice.js';
 
 {
     const HISTORY_KEY = 'dnd.history';
@@ -14,6 +15,8 @@ import {
 
     const QUICK_HASH = 'quick-builds';
     const QUICK_LABEL = 'Quick build';
+    const DICE_HASH = 'dice';
+    const DICE_KEY = 'dnd.dice';
 
 
     const $ = (id) => document.getElementById(id);
@@ -151,6 +154,15 @@ import {
                 onclick: goToCombos,
                 extraClass: 'cat-btn-quick',
             }));
+            items.push(el('li', { class: 'cat-nav-heading', text: 'Tools', 'aria-hidden': 'true' }));
+            items.push(navButton({
+                iconName: 'dice-3',
+                label: 'Dice',
+                title: 'Roll any dice: d4 to d100, modifiers, advantage',
+                current: view && view.type === 'dice',
+                onclick: goToDice,
+                extraClass: 'cat-btn-tool',
+            }));
         }
         els.nav.replaceChildren(...items);
         const currentBtn = els.nav.querySelector('[aria-current="true"]');
@@ -172,10 +184,17 @@ import {
         setView({ type: 'combos' });
     }
 
+    function goToDice() {
+        if (els.search.value) els.search.value = '';
+        if (location.hash !== '#' + DICE_HASH) history_replace('#' + DICE_HASH);
+        setView({ type: 'dice' });
+    }
+
     // View named by the URL hash, or null if it doesn't match anything
     function viewFromHash() {
         const name = decodeURIComponent(location.hash.slice(1));
         if (name === QUICK_HASH) return { type: 'combos' };
+        if (name === DICE_HASH) return { type: 'dice' };
         return structure.some((c) => c.name === name) ? { type: 'category', name } : null;
     }
 
@@ -191,6 +210,7 @@ import {
         const stillValid = view && (
             (view.type === 'category' && structure.some((c) => c.name === view.name)) ||
             view.type === 'combos' ||
+            view.type === 'dice' ||
             view.type === 'search');
         if (stillValid) return view;
         if (structure.length) return { type: 'category', name: structure[0].name };
@@ -202,6 +222,7 @@ import {
     function renderContent() {
         if (view.type === 'category') renderCategory(view.name);
         else if (view.type === 'combos') renderCombos();
+        else if (view.type === 'dice') renderDice();
         else if (view.type === 'search') renderSearch(view.q);
         else renderEmpty();
     }
@@ -357,6 +378,200 @@ import {
         }
     }
 
+    // ---------- Dice ----------
+    const DICE_EXAMPLES = [
+        { notation: '1d20', hint: 'Check' },
+        { notation: '2d6+3', hint: 'Shortsword' },
+        { notation: '4d6kh3', hint: 'Ability score' },
+        { notation: '8d6', hint: 'Fireball' },
+        { notation: '1d20+1d4', hint: 'With Bless' },
+        { notation: '1d100', hint: 'Percentile' },
+    ];
+    const MODE_LABELS = { normal: 'Normal', adv: 'Advantage', dis: 'Disadvantage' };
+
+    function loadDiceSettings() {
+        let saved = {};
+        try { saved = JSON.parse(localStorage.getItem(DICE_KEY)) || {}; } catch { /* ignore */ }
+        const clamp = (v, lo, hi, d) => (Number.isInteger(v) ? Math.min(hi, Math.max(lo, v)) : d);
+        return {
+            count: clamp(saved.count, 1, 20, 1),
+            mod: clamp(saved.mod, -20, 20, 0),
+            mode: MODE_LABELS[saved.mode] ? saved.mode : 'normal',
+        };
+    }
+    const diceSettings = loadDiceSettings();
+    const saveDiceSettings = () => {
+        try { localStorage.setItem(DICE_KEY, JSON.stringify(diceSettings)); } catch { /* ignore */ }
+    };
+
+    const signed = (n) => (n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '+0');
+    const standardNotation = (sides) =>
+        diceSettings.count + 'd' + sides + (diceSettings.mod ? (diceSettings.mod > 0 ? '+' : '') + diceSettings.mod : '');
+
+    let diceUi = null; // live references into the rendered dice view
+
+    function renderDice() {
+        const stepper = (label, key, min, max, fmt) => {
+            const value = el('output', { class: 'dice-step-value', 'aria-live': 'polite' });
+            const dec = el('button', { type: 'button', class: 'dice-step-btn', 'aria-label': 'Decrease ' + label.toLowerCase(), onclick: () => step(key, -1, min, max) }, icon('dash-lg'));
+            const inc = el('button', { type: 'button', class: 'dice-step-btn', 'aria-label': 'Increase ' + label.toLowerCase(), onclick: () => step(key, 1, min, max) }, icon('plus-lg'));
+            return { node: el('div', { class: 'dice-step' }, el('span', { class: 'dice-control-label', text: label }), el('div', { class: 'dice-step-row' }, dec, value, inc)), value, dec, inc, fmt, key, min, max };
+        };
+        const count = stepper('Dice', 'count', 1, 20, (v) => '× ' + v);
+        const mod = stepper('Modifier', 'mod', -20, 20, signed);
+
+        const modeButtons = Object.entries(MODE_LABELS).map(([value, text]) => el('button', {
+            type: 'button',
+            class: 'dice-mode-btn',
+            'aria-pressed': 'false',
+            'data-mode': value,
+            onclick: () => { diceSettings.mode = value; saveDiceSettings(); updateDiceControls(); },
+        }, text));
+
+        const dieButtons = Dice.STANDARD_DICE.map((sides) => {
+            const btn = el('button', {
+                type: 'button',
+                class: 'die-btn',
+                'data-sides': sides,
+                onclick: () => rollDice(standardNotation(sides)),
+            },
+                el('span', { class: 'die-shape die-d' + sides, 'aria-hidden': 'true' }, el('span', { text: sides === 100 ? '%' : sides })),
+                el('span', { class: 'die-name', text: sides === 100 ? 'd100' : 'd' + sides }));
+            return btn;
+        });
+
+        const input = el('input', {
+            type: 'text',
+            id: 'dice-input',
+            class: 'be-input dice-input',
+            placeholder: 'e.g. 2d6+3, 4d6kh3, 1d20+1d4',
+            autocomplete: 'off',
+            spellcheck: 'false',
+            'aria-label': 'Dice to roll',
+            'aria-describedby': 'dice-error',
+        });
+        const error = el('p', { class: 'dice-error', id: 'dice-error', role: 'alert' });
+        const form = el('form', {
+            class: 'dice-form',
+            onsubmit: (e) => { e.preventDefault(); if (rollDice(input.value)) input.select(); },
+        }, input, el('button', { type: 'submit', class: 'btn-gold' }, icon('dice-5'), el('span', { text: 'Roll' })));
+
+        els.content.replaceChildren(
+            el('div', { class: 'content-head' },
+                el('div', { class: 'content-kicker', text: 'Tools' }),
+                el('h1', { class: 'content-title', text: 'Dice' }),
+                el('p', { class: 'content-blurb', text: 'Fair, cryptographically random rolls. Results land in the panel, so you can roll again, copy or pin them.' })),
+
+            el('section', { class: 'dice-card' },
+                el('div', { class: 'dice-buttons' }, ...dieButtons),
+                el('div', { class: 'dice-controls' },
+                    count.node,
+                    mod.node,
+                    el('div', { class: 'dice-mode' },
+                        el('span', { class: 'dice-control-label', text: 'd20 rolls' }),
+                        el('div', { class: 'dice-mode-row', role: 'group', 'aria-label': 'd20 roll mode' }, ...modeButtons)))),
+
+            el('section', { class: 'dice-card' },
+                el('h2', { class: 'dice-card-title', text: 'Type any roll' }),
+                form,
+                error,
+                el('div', { class: 'dice-examples' }, ...DICE_EXAMPLES.map((ex) => el('button', {
+                    type: 'button',
+                    class: 'dice-example',
+                    onclick: () => { input.value = ex.notation; rollDice(ex.notation); },
+                }, el('code', { text: ex.notation }), el('span', { text: ex.hint })))),
+                el('details', { class: 'dice-help' },
+                    el('summary', { text: 'Notation guide' }),
+                    el('dl', {},
+                        el('dt', {}, el('code', { text: '2d6+3' })), el('dd', { text: 'Roll two six-sided dice and add 3. Combine any dice and numbers with + and −.' }),
+                        el('dt', {}, el('code', { text: '4d6kh3' })), el('dd', { text: 'Roll four d6 and keep the highest three (kl keeps the lowest).' }),
+                        el('dt', {}, el('code', { text: 'd%' })), el('dd', { text: 'Percentile die, the same as 1d100.' }),
+                        el('dt', {}, el('span', { text: 'Advantage' })), el('dd', { text: 'With Advantage or Disadvantage selected, every single d20 in a roll is rolled twice, keeping the higher or lower.' })))));
+
+        diceUi = { count, mod, modeButtons, dieButtons, input, error };
+        updateDiceControls();
+    }
+
+    function step(key, delta, min, max) {
+        diceSettings[key] = Math.min(max, Math.max(min, diceSettings[key] + delta));
+        saveDiceSettings();
+        updateDiceControls();
+    }
+
+    function updateDiceControls() {
+        if (!diceUi) return;
+        for (const s of [diceUi.count, diceUi.mod]) {
+            s.value.textContent = s.fmt(diceSettings[s.key]);
+            s.dec.disabled = diceSettings[s.key] <= s.min;
+            s.inc.disabled = diceSettings[s.key] >= s.max;
+        }
+        for (const b of diceUi.modeButtons) b.setAttribute('aria-pressed', String(b.dataset.mode === diceSettings.mode));
+        for (const b of diceUi.dieButtons) {
+            const notation = standardNotation(Number(b.dataset.sides));
+            const withMode = Number(b.dataset.sides) === 20 && diceSettings.mode !== 'normal' ? ' with ' + MODE_LABELS[diceSettings.mode].toLowerCase() : '';
+            b.title = 'Roll ' + notation + withMode;
+            b.setAttribute('aria-label', 'Roll ' + notation + withMode);
+        }
+    }
+
+    // Roll notation in the current mode. Returns true on success.
+    function rollDice(notation, mode = diceSettings.mode) {
+        let parsed;
+        try {
+            parsed = Dice.parse(notation);
+        } catch (err) {
+            if (!(err instanceof Dice.DiceError)) throw err;
+            if (diceUi && view?.type === 'dice') diceUi.error.textContent = err.message;
+            else toast(err.message);
+            return false;
+        }
+        if (diceUi) diceUi.error.textContent = '';
+        const { parsed: rolled, applied } = Dice.applyMode(parsed, mode);
+        const base = Dice.format(parsed);
+        const label = base + (applied ? (mode === 'adv' ? ' (advantage)' : ' (disadvantage)') : '');
+        const result = Dice.roll(rolled);
+        const item = {
+            kind: 'dice',
+            category: 'Dice',
+            sub: label,
+            notation: base,
+            mode: applied ? mode : 'normal',
+            dice: result,
+            text: Dice.describe(label, result),
+        };
+        ++rollSeq; // cancel any in-flight table roll
+        activeKey = null;
+        markActiveTile();
+        els.panel.classList.remove('loading');
+        restartAnimation('rolling');
+        expandPanel();
+        showResult(item, { animate: true });
+        addToHistory(item);
+        return true;
+    }
+
+    function renderDiceResult(r) {
+        const op = (t, i) => (i === 0 ? (t.sign < 0 ? '−' : '') : (t.sign < 0 ? '−' : '+'));
+        return el('div', { class: 'dice-result' + (r.nat20 ? ' is-crit' : '') + (r.nat1 ? ' is-fumble' : '') },
+            el('div', { class: 'dice-total', text: r.total }),
+            el('div', { class: 'dice-breakdown' }, ...r.terms.map((t, i) => {
+                if (t.kind === 'const') return el('span', { class: 'dice-const', text: op(t, i) + t.value });
+                return el('span', { class: 'dice-term' },
+                    op(t, i) ? el('span', { class: 'dice-op', text: op(t, i) }) : null,
+                    el('span', { class: 'dice-term-label', text: Dice.formatTerm(t) + (t.fromMode ? (t.fromMode === 'adv' ? ' adv' : ' dis') : '') }),
+                    ...t.rolls.map((d) => el('span', {
+                        class: 'die-chip'
+                            + (d.kept ? '' : ' is-dropped')
+                            + (t.sides === 20 && d.kept && d.value === 20 ? ' is-20' : '')
+                            + (t.sides === 20 && d.kept && d.value === 1 ? ' is-1' : ''),
+                        title: d.kept ? null : 'Dropped',
+                        text: d.value,
+                    })));
+            })),
+            r.nat20 ? el('div', { class: 'dice-note', text: 'Natural 20!' })
+                : r.nat1 ? el('div', { class: 'dice-note', text: 'Natural 1…' }) : null);
+    }
+
     // ---------- Search ----------
     function renderSearch(q) {
         const needle = q.trim();
@@ -495,7 +710,9 @@ import {
         current = item;
         els.crumb.textContent = crumbOf(item);
         els.text.className = 'result-text';
-        if (item.parts) {
+        if (item.dice) {
+            els.text.replaceChildren(renderDiceResult(item.dice));
+        } else if (item.parts) {
             els.text.replaceChildren(el('dl', { class: 'result-parts' }, ...item.parts.map((p, i) =>
                 el('div', { class: 'result-part' + (i === animatePart ? ' revealed' : '') },
                     el('dt', {},
@@ -519,7 +736,8 @@ import {
     // ---------- Result actions ----------
     const rollAgain = () => {
         if (!current) return;
-        if (current.comboId) rollCombo(current.comboId);
+        if (current.kind === 'dice') rollDice(current.notation, current.mode);
+        else if (current.comboId) rollCombo(current.comboId);
         else roll(current.category, current.sub);
     };
     els.reroll.addEventListener('click', rollAgain);
@@ -740,6 +958,7 @@ import {
         const next = fallbackView();
         if (next.type === 'category') history_replace('#' + encodeURIComponent(next.name));
         else if (next.type === 'combos') history_replace('#' + QUICK_HASH);
+        else if (next.type === 'dice') history_replace('#' + DICE_HASH);
         setView(next);
     }
 
@@ -1289,6 +1508,7 @@ import {
         const next = viewFromHash();
         if (!next) return;
         if (next.type === 'combos') goToCombos();
+        else if (next.type === 'dice') goToDice();
         else goToCategory(next.name);
     });
 }

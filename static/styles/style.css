@@ -1476,3 +1476,244 @@ select.be-input { appearance: auto; }
     .be-footer .btn-outline-gold { flex: 1; justify-content: center; }
     .be-footer .flex-grow-1 { display: none; }
 }
+
+/* =========================================================
+   Tools: Dice
+   ========================================================= */
+.cat-nav-heading {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--faint);
+    padding: 0.9rem 0.75rem 0.25rem;
+}
+.cat-btn-tool .bi { color: var(--gold); }
+
+.dice-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem 1.25rem 1.1rem;
+    margin-bottom: 1rem;
+}
+.dice-card-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin: 0 0 0.75rem;
+}
+
+/* Die buttons */
+.dice-buttons {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+.die-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.75rem 0.25rem 0.6rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    color: var(--muted);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.die-btn:hover { background: var(--surface-2); border-color: var(--border); color: var(--text); }
+.die-btn:active .die-shape { transform: scale(0.92) rotate(-8deg); }
+.die-name { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.02em; }
+.die-shape {
+    width: 58px;
+    height: 58px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(160deg, #f0cd7c 0%, var(--gold) 45%, #a57a25 100%);
+    color: #1a140f;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+    transition: transform 0.15s, filter 0.15s;
+}
+.die-btn:hover .die-shape { filter: brightness(1.08); transform: translateY(-2px); }
+.die-d4   { clip-path: polygon(50% 2%, 98% 94%, 2% 94%); padding-top: 22px; font-size: 0.95rem; }
+.die-d6   { border-radius: 10px; width: 50px; height: 50px; margin: 4px; }
+.die-d8   { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.die-d10  { clip-path: polygon(50% 0, 100% 42%, 50% 100%, 0 42%); padding-bottom: 6px; }
+.die-d12  { clip-path: polygon(50% 0, 100% 38%, 81% 100%, 19% 100%, 0 38%); padding-top: 6px; }
+.die-d20  { clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); }
+.die-d100 { border-radius: 50%; font-size: 1.15rem; }
+
+/* Controls */
+.dice-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 1rem 1.75rem;
+    margin-top: 1.1rem;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--border);
+}
+.dice-control-label {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+    margin-bottom: 0.35rem;
+}
+.dice-step-row {
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+}
+.dice-step-btn {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    background: none;
+    border: 0;
+    color: var(--muted);
+    border-radius: 8px;
+}
+.dice-step-btn:hover:not(:disabled) { color: var(--gold); background: var(--surface-2); }
+.dice-step-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.dice-step-value {
+    min-width: 3rem;
+    text-align: center;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.dice-mode-row {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 3px;
+}
+.dice-mode-btn {
+    background: none;
+    border: 0;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 0.38rem 0.75rem;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+.dice-mode-btn:hover { color: var(--text); }
+.dice-mode-btn[aria-pressed="true"] { background: var(--gold); color: #1a140f; font-weight: 600; }
+
+/* Notation */
+.dice-form { display: flex; gap: 0.5rem; }
+.dice-input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem; }
+.dice-error { color: #e48a83; font-size: 0.85rem; margin: 0.45rem 0 0; min-height: 0; }
+.dice-error:empty { display: none; }
+.dice-examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.85rem;
+}
+.dice-example {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.25rem 0.7rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+.dice-example code { color: var(--gold); font-size: 0.85rem; }
+.dice-example:hover { border-color: var(--gold); color: var(--text); }
+.dice-help { margin-top: 1rem; font-size: 0.85rem; color: var(--muted); }
+.dice-help summary { cursor: pointer; color: var(--muted); width: max-content; }
+.dice-help summary:hover { color: var(--gold); }
+.dice-help dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 0.4rem 1rem;
+    margin: 0.75rem 0 0;
+}
+.dice-help dt { font-weight: 500; }
+.dice-help dt code { color: var(--gold); }
+.dice-help dd { margin: 0; }
+
+/* Result on the parchment panel */
+.dice-result { text-align: center; padding: 0.25rem 0 0.35rem; }
+.dice-total {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 3.4rem;
+    line-height: 1;
+    color: var(--ink);
+    font-variant-numeric: lining-nums;
+}
+.dice-result.is-crit .dice-total { color: #9a6a00; text-shadow: 0 0 18px rgba(212, 166, 74, 0.55); }
+.dice-result.is-fumble .dice-total { color: #8b1d16; }
+.dice-breakdown {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.35rem 0.6rem;
+    margin-top: 0.7rem;
+    font-family: var(--font-ui);
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+}
+.dice-term { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.25rem; }
+.dice-op, .dice-const { font-weight: 600; color: var(--ink); font-size: 0.95rem; }
+.dice-term-label { font-weight: 600; margin-right: 0.1rem; }
+.die-chip {
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding: 0 0.3rem;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid rgba(42, 31, 22, 0.35);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.35);
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+}
+.die-chip.is-dropped { opacity: 0.4; text-decoration: line-through; }
+.die-chip.is-20 { background: var(--gold); border-color: #9a6a00; }
+.die-chip.is-1 { background: #c0473e; border-color: #8b1d16; color: #fff; }
+.dice-note {
+    margin-top: 0.55rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #9a6a00;
+}
+.dice-result.is-fumble .dice-note { color: #8b1d16; }
+.result-panel.revealed .dice-total { animation: dice-pop 0.35s ease-out; }
+@keyframes dice-pop {
+    0%   { transform: scale(0.6); opacity: 0; }
+    70%  { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); }
+}
+
+@media (max-width: 1199.98px) {
+    .cat-nav-heading { display: none; }
+}
+@media (max-width: 899.98px) {
+    .dice-buttons { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .die-shape { width: 52px; height: 52px; }
+    .die-d6 { width: 44px; height: 44px; }
+    .dice-controls { gap: 0.9rem 1.25rem; }
+    .dice-mode { width: 100%; }
+    .dice-mode-row { width: 100%; }
+    .dice-mode-btn { flex: 1; padding-left: 0.4rem; padding-right: 0.4rem; }
+    .dice-help dl { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
+    .dice-help dd { margin-bottom: 0.5rem; }
+    .dice-total { font-size: 2.8rem; }
+}

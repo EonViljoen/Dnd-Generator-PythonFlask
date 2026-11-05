@@ -45,6 +45,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 🎲 **One-click rolls** | Pick a table and roll. The result appears on a parchment panel with **Roll again**, **Copy** and **Pin**. |
 | ⚡ **Quick builds** | Roll several tables at once: a Quick NPC, Tavern, Town, Villain or Side Quest. Reroll any single line you don't like. |
 | 🛠️ **Your own builds** | Create Quick builds from any tables: name each line, pick an icon, reorder lines, or copy a built-in build as a starting point. |
+| 🎯 **Dice roller** | d4 to d100 with a count, modifier and advantage/disadvantage, or type any notation (`2d6+3`, `4d6kh3`, `1d20+1d4`). Shows every die, highlights natural 20s and 1s, and uses fair cryptographic randomness. |
 | 🔀 **Surprise me** | Roll on a random table, or on any table within the current category. |
 | 🔍 **Search** | Search every table name and all 10k+ prompts, with highlighted matches. |
 | 📜 **Browse tables** | View any table as a numbered, filterable list, and copy or pin individual entries. |
@@ -58,7 +59,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | Key | Action |
 |-----|--------|
 | <kbd>/</kbd> | Focus search |
-| <kbd>R</kbd> | Roll the last table or build again |
+| <kbd>R</kbd> | Roll the last table, build or dice again |
 | <kbd>S</kbd> | Surprise me (roll on a random table) |
 | <kbd>Esc</kbd> | Clear search or close a dialog |
 
@@ -121,7 +122,8 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 |------|----------|
 | Vanilla JavaScript (ES modules) | All UI logic, with no framework or build step (`app.js`, `data.js`) |
 | [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API) | Stores custom JSON tables and custom Quick builds in the browser |
-| [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history and hidden tables |
+| [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history, hidden tables and dice settings |
+| [Web Crypto](https://developer.mozilla.org/docs/Web/API/Crypto/getRandomValues) | Unbiased dice rolls (`crypto.getRandomValues` with rejection sampling) |
 | [Bootstrap 5.3](https://getbootstrap.com/) | Modals and base styles (dark theme) |
 | [Bootstrap Icons 1.11](https://icons.getbootstrap.com/) | Every icon in the app, including the category and build icon picker |
 | [Google Fonts](https://fonts.google.com/) | *Cinzel* for headings, *EB Garamond* for prompt text |
@@ -182,6 +184,12 @@ Then open <http://localhost:5001>. The generator is at `/cards`.
 
 Run `deactivate` to leave the virtual environment.
 
+**Tests:** the dice engine has unit tests that run with Node's built-in test runner (Node 18+):
+
+```bash
+node --test tests/*.test.mjs
+```
+
 ## Project structure
 
 ```text
@@ -199,9 +207,11 @@ Run `deactivate` to leave the virtual environment.
 ├── static/
 │   ├── scripts/
 │   │   ├── app.js        # Generator UI (ES module)
-│   │   └── data.js       # Data layer: server/local sources, IndexedDB, validation
+│   │   ├── data.js       # Data layer: server/local sources, IndexedDB, validation
+│   │   └── dice.js       # Dice notation parser and fair roller (no DOM, testable in Node)
 │   ├── styles/style.css  # Theme and layout
 │   └── images/           # Favicon (SVG, ICO) and Apple touch icon
+├── tests/                # Node tests for the dice engine
 ├── docs/screenshots/      # README screenshots
 ├── procfile              # Gunicorn start command
 └── .render.yaml          # Render service config
@@ -297,6 +307,6 @@ The app is deployed on [Render](https://render.com/) and redeploys automatically
 - [x] Redesigned generator: categories, search, pins and history
 - [x] Quick builds, plus your own custom builds
 - [x] Custom JSON tables and show/hide, kept in the browser
-- [ ] Dice roller tool
+- [x] Dice roller tool
 - [ ] Edit tables directly in the browser
 - [ ] Optional accounts to sync tables and builds across devices
