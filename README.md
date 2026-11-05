@@ -15,6 +15,10 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white)
 ![Render](https://img.shields.io/badge/Hosted%20on-Render-46E3B7?logo=render&logoColor=white)
 
+<br><br>
+
+<img src="docs/screenshots/generator.webp" alt="The generator: category sidebar, table tiles, a rolled prompt on the parchment result panel, pins and recent rolls" width="100%">
+
 </div>
 
 ---
@@ -22,6 +26,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 ## Contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Tech stack and tools](#tech-stack-and-tools)
 - [Getting started](#getting-started)
 - [Project structure](#project-structure)
@@ -56,6 +61,47 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | <kbd>R</kbd> | Roll the last table or build again |
 | <kbd>S</kbd> | Surprise me (roll on a random table) |
 | <kbd>Esc</kbd> | Clear search or close a dialog |
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/home.webp" alt="Homepage with a live random prompt">
+      <p align="center"><b>Homepage</b>: a live random prompt and every category at a glance</p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/quick-builds.webp" alt="Quick builds view with a rolled Quick Tavern">
+      <p align="center"><b>Quick builds</b>: roll a whole tavern, reroll any line</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/build-editor.webp" alt="Build editor with three lines">
+      <p align="center"><b>Build editor</b>: make your own builds from any tables</p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/search.webp" alt="Search results for dragon with highlighted matches">
+      <p align="center"><b>Search</b>: every table and all 10k+ prompts</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/browse.webp" alt="Browsing the Potion Effects table, filtered by speed">
+      <p align="center"><b>Browse a table</b>: filter, copy or pin any entry</p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/customize.webp" alt="Customize panel: load your own JSON and show or hide tables">
+      <p align="center"><b>Customize</b>: your own JSON, kept in your browser</p>
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/mobile.webp" alt="The generator on a phone with the result sheet docked at the bottom" width="300">
+  <br>
+  <b>On your phone</b>: category chips and a bottom result sheet
+</p>
 
 ## Tech stack and tools
 
@@ -156,6 +202,7 @@ Run `deactivate` to leave the virtual environment.
 │   │   └── data.js       # Data layer: server/local sources, IndexedDB, validation
 │   ├── styles/style.css  # Theme and layout
 │   └── images/           # Favicon (SVG, ICO) and Apple touch icon
+├── docs/screenshots/      # README screenshots
 ├── procfile              # Gunicorn start command
 └── .render.yaml          # Render service config
 ```
