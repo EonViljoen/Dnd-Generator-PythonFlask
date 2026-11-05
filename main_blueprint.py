@@ -13,4 +13,4 @@ def Cards():
 
 @main_blueprint.route('/favicon.ico')
 def favicon():
-    return send_from_directory(current_app.static_folder, 'images/favicon.ico', mimetype='image/png')  # file is a PNG despite the .ico name
+    return send_from_directory(current_app.static_folder, 'images/favicon.ico', mimetype='image/vnd.microsoft.icon')
