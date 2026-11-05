@@ -52,6 +52,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 📜 **Browse tables** | View any table as a numbered, filterable list, and copy or pin individual entries. |
 | 📌 **Pins and history** | Keep the prompts you'll use tonight. Your last 10 rolls are always one click away. |
 | 🎛️ **Customize** | Hide tables you don't use, or load your own JSON, added to the defaults or replacing them, with a custom icon per category. |
+| 🔗 **Share by link** | Share a result, a custom Quick build or a saved roll with a link. The data lives in the link itself (after the `#`, which never reaches the server); opening it shows the result or offers to add the build/roll. Shared dice show the exact same roll. |
 | 🔒 **Private by design** | Custom tables, builds, pins and history stay in your browser. Nothing is uploaded and there are no accounts. |
 | 📱 **Works anywhere** | Responsive layout: sidebar on desktop, scrolling category chips and a bottom result sheet on phones. |
 

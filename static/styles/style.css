@@ -1865,6 +1865,10 @@ select.be-input { appearance: auto; }
 .inline-die-total:empty { display: none; }
 .inline-die-total.pop { display: inline-block; animation: dice-pop 0.3s ease-out; }
 
+/* Four result buttons fit on one row in the side panel */
+.result-actions { gap: 0.3rem; }
+.result-actions .btn-ink, .result-actions .btn-ink-outline { padding: 0.36rem 0.55rem; font-size: 0.8rem; gap: 0.3rem; }
+
 /* =========================================================
    Tools: Initiative tracker
    ========================================================= */
@@ -2110,3 +2114,35 @@ select.be-input { appearance: auto; }
     .init-hp-top { flex: 1; }
     .init-hint { display: none; }
 }
+
+/* Share links */
+.combo-tools { display: inline-flex; align-items: center; }
+.share-preview {
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+}
+.share-preview .combo-icon, .share-preview .saved-roll-icon { flex: none; }
+.share-lines {
+    margin: 0;
+    padding-left: 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+}
+.share-lines li { line-height: 1.35; }
+.share-lines li::marker { color: var(--faint); }
+.share-lines strong { margin-right: 0.45rem; }
+.share-line-table { color: var(--muted); font-size: 0.85rem; }
+.share-missing {
+    margin-left: 0.4rem;
+    font-size: 0.7rem;
+    color: #e0b866;
+    border: 1px solid rgba(212, 166, 74, 0.5);
+    border-radius: 999px;
+    padding: 0 0.4rem;
+}
+.share-notation { color: var(--gold); font-size: 1.2rem; margin-right: 0.5rem; }
+#share-body > p { margin: 0.9rem 0 0; }
+#share-accept[hidden] { display: none; }

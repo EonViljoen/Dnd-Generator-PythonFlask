@@ -56,6 +56,9 @@
             <button type="button" class="btn-ink-outline" id="btn-pin" disabled title="Pin for later">
               <i class="bi bi-pin-angle"></i> <span>Pin</span>
             </button>
+            <button type="button" class="btn-ink-outline" id="btn-share" disabled title="Copy a link to this result">
+              <i class="bi bi-link-45deg"></i> <span>Share</span>
+            </button>
           </div>
         </section>
 
@@ -177,6 +180,26 @@
               </div>
               <div id="cz-vis-list" class="cz-vis-list"></div>
             </section>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared link preview -->
+    <div class="modal fade" id="shareModal" tabindex="-1" aria-labelledby="shareModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div class="flex-grow-1">
+              <div class="modal-kicker"><i class="bi bi-link-45deg"></i> Shared with you</div>
+              <h5 class="modal-title" id="shareModalLabel"></h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="share-body"></div>
+          <div class="modal-footer be-footer">
+            <button type="button" class="btn-outline-gold" data-bs-dismiss="modal">Not now</button>
+            <button type="button" class="btn-gold" id="share-accept"></button>
           </div>
         </div>
       </div>

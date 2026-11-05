@@ -3,6 +3,7 @@ import {
     api, customData, createSource, parseCustomJson, ValidationError, downloadJson, MAX_FILE_BYTES,
     ICON_CHOICES, iconFor, userBuilds, newBuildId,
     savedRolls, newRollId, MAX_ROLL_NAME, MAX_SAVED_ROLLS,
+    encodeShare, decodeShare, cleanBuild, cleanRoll, MAX_SHARE_LENGTH,
     DEFAULT_BUILD_ICON, MAX_BUILD_LINES, MIN_BUILD_LINES, MAX_TITLE_LENGTH,
 } from './data.js';
 import * as Dice from './dice.js';
@@ -38,6 +39,7 @@ import * as Init from './initiative.js';
         reroll: $('btn-reroll'),
         copy: $('btn-copy'),
         pin: $('btn-pin'),
+        share: $('btn-share'),
         collapse: $('result-collapse'),
         pinnedList: $('pinned-list'),
         pinnedEmpty: $('pinned-empty'),
@@ -354,7 +356,9 @@ import * as Init from './initiative.js';
                     onclick: () => rollCombo(combo.id),
                 }, icon('dice-5'), el('span', { text: 'Roll ' + combo.title.replace(/^Quick /, '') })),
                 combo.own
-                    ? el('button', { type: 'button', class: 'icon-btn', title: 'Edit ' + combo.title, 'aria-label': 'Edit ' + combo.title, onclick: () => openBuilder(combo.id) }, icon('pencil'))
+                    ? el('span', { class: 'combo-tools' },
+                        el('button', { type: 'button', class: 'icon-btn', title: 'Share a link to ' + combo.title, 'aria-label': 'Share ' + combo.title, onclick: () => shareBuild(combo.id) }, icon('link-45deg')),
+                        el('button', { type: 'button', class: 'icon-btn', title: 'Edit ' + combo.title, 'aria-label': 'Edit ' + combo.title, onclick: () => openBuilder(combo.id) }, icon('pencil')))
                     : el('button', { type: 'button', class: 'icon-btn', title: 'Make your own version of ' + combo.title, 'aria-label': 'Make your own version of ' + combo.title, onclick: () => copyBuiltIn(combo.id) }, icon('copy'))));
     }
 
@@ -902,6 +906,7 @@ import * as Init from './initiative.js';
                     el('span', { class: 'saved-roll-meta' },
                         el('code', { text: r.notation }),
                         r.mode !== 'normal' ? el('span', { class: 'saved-roll-badge', text: MODE_SHORT[r.mode] }) : null))),
+            el('button', { type: 'button', class: 'icon-btn', title: 'Share a link to ' + r.name, 'aria-label': 'Share ' + r.name, onclick: () => shareRoll(r.id) }, icon('link-45deg')),
             el('button', { type: 'button', class: 'icon-btn', title: 'Edit ' + r.name, 'aria-label': 'Edit ' + r.name, onclick: () => openRollEditor(r.id) }, icon('pencil')),
             el('button', { type: 'button', class: 'icon-btn', title: 'Delete ' + r.name, 'aria-label': 'Delete ' + r.name, onclick: () => deleteRoll(r.id) }, icon('trash')));
     }
@@ -1239,16 +1244,188 @@ import * as Init from './initiative.js';
             fill(els.text, withInlineDice(item.text));
         }
         if (animate) restartAnimation('revealed');
-        els.reroll.disabled = els.copy.disabled = els.pin.disabled = false;
+        els.reroll.disabled = els.copy.disabled = els.pin.disabled = els.share.disabled = false;
         updatePinButton();
+    }
+
+    // ---------- Share links ----------
+    // Everything travels in the URL after "#", so nothing is uploaded or stored on the server.
+    const shareUrlFor = (payload) => {
+        const token = encodeShare(payload);
+        return token.length > MAX_SHARE_LENGTH ? null : location.origin + '/cards#share=' + token;
+    };
+
+    async function shareLink(payload, title) {
+        const url = shareUrlFor(payload);
+        if (!url) { toast('That’s too long to share as a link'); return; }
+        if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+            try { await navigator.share({ title, url }); return; }
+            catch (err) { if (err?.name === 'AbortError') return; }
+        }
+        try {
+            await copyText(url);
+            toast('Link copied. Anyone with it can open it');
+        } catch {
+            window.prompt('Copy this link:', url);
+        }
+    }
+
+    function shareBuild(id) {
+        const b = builds.find((x) => x.id === id);
+        if (b) shareLink({ type: 'build', build: { title: b.title, icon: b.icon, parts: b.parts } }, b.title);
+    }
+
+    function shareRoll(id) {
+        const r = rollList.find((x) => x.id === id);
+        if (r) shareLink({ type: 'roll', roll: { name: r.name, notation: r.notation, mode: r.mode } }, r.name);
+    }
+
+    function resultPayload(item) {
+        if (item.kind === 'dice') {
+            const values = item.dice.terms.flatMap((t) => (t.rolls ? t.rolls.map((d) => d.value) : []));
+            return { type: 'result', result: { kind: 'dice', notation: item.notation, mode: item.mode, name: item.name || null, values } };
+        }
+        if (item.parts) {
+            return { type: 'result', result: { kind: 'build', title: item.sub, icon: combos.find((c) => c.id === item.comboId)?.icon, parts: item.parts.map(({ label, category, sub, text }) => ({ label, category, sub, text })) } };
+        }
+        return { type: 'result', result: { kind: 'prompt', category: item.category, sub: item.sub, text: item.text } };
+    }
+    els.share.addEventListener('click', () => current && shareLink(resultPayload(current), crumbOf(current)));
+
+    // Opening a link: #share=<token>
+    function takeShareToken() {
+        if (!location.hash.startsWith('#share=')) return null;
+        const token = location.hash.slice('#share='.length);
+        window.history.replaceState(null, '', location.pathname + location.search);
+        return token;
+    }
+
+    const shareModalEl = $('shareModal');
+    const shareModal = new bootstrap.Modal(shareModalEl);
+    const shareUi = { title: $('shareModalLabel'), body: $('share-body'), accept: $('share-accept') };
+
+    // No acceptLabel (e.g. already saved, or the list is full) means preview only, no button
+    function openShareModal(title, body, acceptLabel, onAccept) {
+        if (!acceptLabel) onAccept = null;
+        shareUi.title.textContent = title;
+        fill(shareUi.body, ...body);
+        shareUi.accept.hidden = !onAccept;
+        shareUi.accept.disabled = !onAccept;
+        fill(shareUi.accept, ...(acceptLabel ? [icon('plus-lg'), ' ', acceptLabel] : []));
+        shareUi.accept.onclick = onAccept ? async () => { shareUi.accept.disabled = true; if (await onAccept() !== false) shareModal.hide(); else shareUi.accept.disabled = false; } : null;
+        shareModal.show();
+    }
+
+    const text = (v, max) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
+    const tableExists = (category, sub) => allStructure.some((c) => c.name === category && c.subcategories.some((s) => s.name === sub));
+
+    function handleShareToken(token) {
+        const data = decodeShare(token);
+        if (!data) { toast('That share link couldn’t be read'); return; }
+        if (data.type === 'build') return previewSharedBuild(data.build);
+        if (data.type === 'roll') return previewSharedRoll(data.roll);
+        if (data.type === 'result') return showSharedResult(data.result);
+        toast('That share link couldn’t be read');
+    }
+
+    function previewSharedBuild(raw) {
+        const b = cleanBuild({ ...(raw || {}), id: 'shared' });
+        if (!b) { toast('That shared build couldn’t be read'); return; }
+        const missing = b.parts.filter((p) => !tableExists(p.category, p.sub)).length;
+        const dupe = builds.some((x) => x.title === b.title && JSON.stringify(x.parts) === JSON.stringify(b.parts));
+        openShareModal('Quick build: ' + b.title, [
+            el('div', { class: 'share-preview' },
+                el('span', { class: 'combo-icon' }, icon(b.icon)),
+                el('ol', { class: 'share-lines' }, ...b.parts.map((p) => el('li', {},
+                    el('strong', { text: p.label }),
+                    el('span', { class: 'share-line-table', text: p.category + ' › ' + p.sub }),
+                    tableExists(p.category, p.sub) ? null : el('span', { class: 'share-missing', text: 'not in your tables' }))))),
+            missing ? el('p', { class: 'dice-info', text: plural(missing, 'line') + ' use tables you don’t have, so they’ll be skipped when rolling.' }) : null,
+            dupe ? el('p', { class: 'side-list-empty', text: 'You already have this build.' }) : null,
+        ], dupe ? null : 'Add to my builds', async () => {
+            const now = new Date().toISOString();
+            const record = { ...b, id: newBuildId(), createdAt: now, updatedAt: now };
+            if (!(await saveBuilds([...builds, record]))) { toast('Could not save the build in this browser'); return false; }
+            activeKey = 'combo|' + record.id;
+            goToCombos();
+            toast('Added “' + record.title + '” to your builds');
+        });
+    }
+
+    function previewSharedRoll(raw) {
+        const r = cleanRoll({ ...(raw || {}), id: 'shared' });
+        if (!r) { toast('That shared roll couldn’t be read'); return; }
+        const dupe = rollList.some((x) => x.name === r.name && x.notation === r.notation && x.mode === r.mode);
+        const full = rollList.length >= MAX_SAVED_ROLLS;
+        openShareModal('Saved roll: ' + r.name, [
+            el('div', { class: 'share-preview' },
+                el('span', { class: 'saved-roll-icon' }, icon('dice-5')),
+                el('div', {},
+                    el('code', { class: 'share-notation', text: r.notation }),
+                    r.mode !== 'normal' ? el('span', { class: 'saved-roll-badge', text: MODE_LABELS[r.mode] }) : null)),
+            dupe ? el('p', { class: 'side-list-empty', text: 'You already have this roll.' }) : null,
+            full ? el('p', { class: 'dice-info', text: 'Your saved rolls are full (' + MAX_SAVED_ROLLS + '). Delete one to add this.' }) : null,
+        ], dupe || full ? null : 'Add to my rolls', async () => {
+            const now = new Date().toISOString();
+            const record = { ...r, id: newRollId(), createdAt: now, updatedAt: now };
+            const next = [...rollList, record];
+            try { await savedRolls.save(next); } catch { toast('Could not save the roll in this browser'); return false; }
+            rollList = next;
+            goToDice();
+            toast('Added “' + record.name + '” to your saved rolls');
+        });
+    }
+
+    function showSharedResult(r) {
+        if (!r || typeof r !== 'object') { toast('That shared result couldn’t be read'); return; }
+        let item = null;
+        if (r.kind === 'prompt') {
+            const category = text(r.category, 120), sub = text(r.sub, 200), body = text(r.text, 5000);
+            if (category && sub && body) item = { category, sub, text: body };
+        } else if (r.kind === 'build' && Array.isArray(r.parts) && r.parts.length <= MAX_BUILD_LINES) {
+            const parts = r.parts.map((p) => ({ label: text(p?.label, 40), category: text(p?.category, 120), sub: text(p?.sub, 200), text: text(p?.text, 5000) }));
+            const title = text(r.title, MAX_TITLE_LENGTH);
+            if (title && parts.length && parts.every((p) => p.label && p.category && p.sub && p.text)) {
+                const match = combos.find((c) => c.title === title);
+                item = comboItem(match ? match.id : null, title, parts);
+            }
+        } else if (r.kind === 'dice') {
+            item = sharedDiceItem(r);
+        }
+        if (!item) { toast('That shared result couldn’t be read'); return; }
+        showResult(item, { animate: true });
+        expandPanel();
+        toast('Shared with you: ' + crumbOf(item));
+    }
+
+    // Rebuild a shared dice roll from its notation and the exact die values, so it shows the same total
+    function sharedDiceItem(r) {
+        const mode = ['adv', 'dis'].includes(r.mode) ? r.mode : 'normal';
+        const name = text(r.name, MAX_ROLL_NAME);
+        let parsed;
+        try { parsed = Dice.parse(r.notation); } catch { return null; }
+        const { parsed: rolled, applied } = Dice.applyMode(parsed, mode);
+        const values = Array.isArray(r.values) ? r.values : [];
+        let i = 0, ok = true;
+        const result = Dice.roll(rolled, (sides) => {
+            const v = values[i++];
+            if (!Number.isInteger(v) || v < 1 || v > sides) ok = false;
+            return ok ? v : 1;
+        });
+        if (!ok || i !== values.length) return null;
+        const base = Dice.format(parsed);
+        const label = (name ? name + ' · ' : '') + base + (applied ? (mode === 'adv' ? ' (advantage)' : ' (disadvantage)') : '');
+        return { kind: 'dice', category: 'Dice', sub: label, notation: base, mode: applied ? mode : 'normal', name, dice: result, text: Dice.describe(label, result) };
     }
 
     // ---------- Result actions ----------
     const rollAgain = () => {
         if (!current) return;
         if (current.kind === 'dice') rollDice(current.notation, current.mode, current.name);
-        else if (current.comboId) rollCombo(current.comboId);
-        else roll(current.category, current.sub);
+        else if (current.parts) {
+            if (current.comboId && combos.some((c) => c.id === current.comboId)) rollCombo(current.comboId);
+            else toast('Add this build to your builds to roll it again');
+        } else roll(current.category, current.sub);
     };
     els.reroll.addEventListener('click', rollAgain);
 
@@ -1987,6 +2164,7 @@ import * as Init from './initiative.js';
     });
 
     // ---------- Init ----------
+    const pendingShare = takeShareToken();
     renderPins();
     renderHistory();
     Promise.all([api(['structure']), api(['combos']).catch(() => [])])
@@ -2007,6 +2185,7 @@ import * as Init from './initiative.js';
                 toast('Couldn’t load your custom tables, showing the defaults');
             }
             setView(viewFromHash() || fallbackView());
+            if (pendingShare) handleShareToken(pendingShare);
 
             // /cards?customize (linked from the homepage) opens the Customize panel
             const params = new URLSearchParams(location.search);
@@ -2020,6 +2199,8 @@ import * as Init from './initiative.js';
         });
 
     window.addEventListener('hashchange', () => {
+        const token = takeShareToken();
+        if (token) { handleShareToken(token); return; }
         const next = viewFromHash();
         if (!next) return;
         if (next.type === 'combos') goToCombos();

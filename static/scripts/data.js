@@ -105,7 +105,7 @@ export const MAX_TITLE_LENGTH = 60;
 
 const isText = (v) => typeof v === 'string' && v.trim() !== '';
 
-function cleanBuild(b) {
+export function cleanBuild(b) {
     if (!isPlainObject(b) || !isText(b.id) || !isText(b.title) || !Array.isArray(b.parts)) return null;
     const parts = b.parts
         .filter((p) => isPlainObject(p) && isText(p.label) && isText(p.category) && isText(p.sub))
@@ -145,7 +145,7 @@ export const MAX_ROLL_NAME = 40;
 export const MAX_SAVED_ROLLS = 50;
 const ROLL_MODES = new Set(['normal', 'adv', 'dis']);
 
-function cleanRoll(r) {
+export function cleanRoll(r) {
     if (!isPlainObject(r) || !isText(r.id) || !isText(r.name) || !isText(r.notation)) return null;
     try { parseDice(r.notation); } catch { return null; }
     return {
@@ -355,4 +355,30 @@ export async function createSource(custom, serverStructure) {
     if (custom.mode === 'replace') return new LocalSource(custom.data, meta);
     const base = await api(['getall']);
     return new LocalSource(mergeData(base, custom.data), meta);
+}
+
+// ---------- Share links ----------
+// Shared data travels in the URL fragment (#share=...), which browsers never send to the server.
+// Payload: { v: 1, type: 'build' | 'roll' | 'result', ... } as base64url-encoded UTF-8 JSON.
+export const MAX_SHARE_LENGTH = 6000;
+
+export function encodeShare(payload) {
+    const bytes = new TextEncoder().encode(JSON.stringify({ v: 1, ...payload }));
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export function decodeShare(token) {
+    if (typeof token !== 'string' || !token || token.length > MAX_SHARE_LENGTH * 2) return null;
+    try {
+        let b64 = token.replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        const bin = atob(b64);
+        const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+        const data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+        return isPlainObject(data) && data.v === 1 ? data : null;
+    } catch {
+        return null;
+    }
 }
