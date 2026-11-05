@@ -1,67 +1,255 @@
-# Dnd Prompt Helper
-Web Api to retrieve json with cool Generated Dnd information for quick retrieval. Just going to be simple GET REST requests. Has a web page that dynamically renders the json as cards to get a random prompt, or the entire list.
+<div align="center">
 
-Live URL: https://dnd-generator-pythonflask.onrender.com/cards
+<img src="static/images/favicon.svg" alt="D&D Prompt Helper logo" width="72" height="72">
 
-## Requirements
-- [Python 3](https://www.python.org/downloads/)
+# D&D Prompt Helper
 
-## To Setup
-- Setup Project
-```
-git clone "https://github.com/EonViljoen/Dnd-Generator-PythonFlask.git"
+**Never get caught without an answer.**
+Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and more, one click away.
+
+[**Open the live app →**](https://dnd-generator-pythonflask.onrender.com/)
+
+![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-3.0-000000?logo=flask&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES%20modules-F7DF1E?logo=javascript&logoColor=black)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white)
+![Render](https://img.shields.io/badge/Hosted%20on-Render-46E3B7?logo=render&logoColor=white)
+
+</div>
+
+---
+
+## Contents
+
+- [Features](#features)
+- [Tech stack and tools](#tech-stack-and-tools)
+- [Getting started](#getting-started)
+- [Project structure](#project-structure)
+- [The prompt data](#the-prompt-data)
+- [Your own tables and builds](#your-own-tables-and-builds)
+- [API](#api)
+- [Deployment](#deployment)
+- [Roadmap](#roadmap)
+
+## Features
+
+**10,514 prompts** across **108 tables** in **7 categories**, from riddles and deadly traps to tavern names and an ogre's pocket contents.
+
+| | |
+|---|---|
+| 🎲 **One-click rolls** | Pick a table and roll. The result appears on a parchment panel with **Roll again**, **Copy** and **Pin**. |
+| ⚡ **Quick builds** | Roll several tables at once: a Quick NPC, Tavern, Town, Villain or Side Quest. Reroll any single line you don't like. |
+| 🛠️ **Your own builds** | Create Quick builds from any tables: name each line, pick an icon, reorder lines, or copy a built-in build as a starting point. |
+| 🔀 **Surprise me** | Roll on a random table, or on any table within the current category. |
+| 🔍 **Search** | Search every table name and all 10k+ prompts, with highlighted matches. |
+| 📜 **Browse tables** | View any table as a numbered, filterable list, and copy or pin individual entries. |
+| 📌 **Pins and history** | Keep the prompts you'll use tonight. Your last 10 rolls are always one click away. |
+| 🎛️ **Customize** | Hide tables you don't use, or load your own JSON, added to the defaults or replacing them, with a custom icon per category. |
+| 🔒 **Private by design** | Custom tables, builds, pins and history stay in your browser. Nothing is uploaded and there are no accounts. |
+| 📱 **Works anywhere** | Responsive layout: sidebar on desktop, scrolling category chips and a bottom result sheet on phones. |
+
+### Keyboard shortcuts
+
+| Key | Action |
+|-----|--------|
+| <kbd>/</kbd> | Focus search |
+| <kbd>R</kbd> | Roll the last table or build again |
+| <kbd>S</kbd> | Surprise me (roll on a random table) |
+| <kbd>Esc</kbd> | Clear search or close a dialog |
+
+## Tech stack and tools
+
+### Backend
+
+| Tool | Used for |
+|------|----------|
+| [Python 3](https://www.python.org/) | Language (3.9+) |
+| [Flask 3](https://flask.palletsprojects.com/) | Web framework, routing and blueprints |
+| [Flask-RESTful](https://flask-restful.readthedocs.io/) | JSON API resources under `/api` |
+| [Jinja2](https://jinja.palletsprojects.com/) | Server-rendered templates (shared `base.html`, homepage stats and cards) |
+| [Gunicorn](https://gunicorn.org/) | Production WSGI server |
+
+### Frontend
+
+| Tool | Used for |
+|------|----------|
+| Vanilla JavaScript (ES modules) | All UI logic, with no framework or build step (`app.js`, `data.js`) |
+| [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API) | Stores custom JSON tables and custom Quick builds in the browser |
+| [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history and hidden tables |
+| [Bootstrap 5.3](https://getbootstrap.com/) | Modals and base styles (dark theme) |
+| [Bootstrap Icons 1.11](https://icons.getbootstrap.com/) | Every icon in the app, including the category and build icon picker |
+| [Google Fonts](https://fonts.google.com/) | *Cinzel* for headings, *EB Garamond* for prompt text |
+| Custom CSS | The "tavern at night" theme, built on CSS custom properties |
+
+### Hosting and tooling
+
+| Tool | Used for |
+|------|----------|
+| [Render](https://render.com/) | Hosting, with automatic deploys on push to `main` |
+| [Git](https://git-scm.com/) and [GitHub](https://github.com/EonViljoen/Dnd-Generator-PythonFlask) | Version control |
+| [Claude Code](https://claude.com/claude-code) | AI pair programmer used for the UI redesign and newer features |
+
+## Getting started
+
+**Requirements:** [Python 3.9+](https://www.python.org/downloads/)
+
+```bash
+git clone https://github.com/EonViljoen/Dnd-Generator-PythonFlask.git
 cd Dnd-Generator-PythonFlask
-python -m venv venv*
-.\venv\Scripts\activate*
+python3 -m venv venv
 ```
 
-* - If Virtual Envirornment is used. To deactivate Virtual Environment, use `deactivate` in the Virtual Environment directory.
+Activate the virtual environment and install dependencies:
 
-## Run App Locally
- ```
+<table>
+<tr><th>macOS / Linux</th><th>Windows (PowerShell)</th></tr>
+<tr>
+<td>
+
+```bash
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+</td>
+<td>
+
+```powershell
+.\venv\Scripts\activate
 pip install -r .\requirements.txt
-python .\main.py
 ```
 
-## Adding Custom Prompts
-Json is structure a specific way for the App to be able to read single / multiple entries. Structure is as follows:
+</td>
+</tr>
+</table>
 
+Run the development server:
+
+```bash
+flask --app main run --debug --port 5001
 ```
+
+Then open <http://localhost:5001>. The generator is at `/cards`.
+
+> [!TIP]
+> On macOS, port 5000 (Flask's default) is usually taken by AirPlay Receiver, hence `--port 5001`. `python main.py` also works and uses port 5000.
+
+Run `deactivate` to leave the virtual environment.
+
+## Project structure
+
+```text
+├── main.py               # App setup: Flask app, blueprints, JSON settings
+├── main_blueprint.py     # Pages: / (home), /cards (generator), /favicon.ico
+├── api_blueprint.py      # API route registration (/api/...)
+├── routes.py             # API resources (Flask-RESTful)
+├── jsonReader.py         # Loads rpg_generator.json; roll, search, structure, combos
+├── catalog.py            # Category icons and blurbs, built-in Quick build recipes
+├── rpg_generator.json    # The prompt data
+├── templates/
+│   ├── base.html         # Shared <head>, fonts and header
+│   ├── index.html        # Homepage
+│   └── card.html         # Generator page and its modals
+├── static/
+│   ├── scripts/
+│   │   ├── app.js        # Generator UI (ES module)
+│   │   └── data.js       # Data layer: server/local sources, IndexedDB, validation
+│   ├── styles/style.css  # Theme and layout
+│   └── images/           # Favicon (SVG, ICO) and Apple touch icon
+├── procfile              # Gunicorn start command
+└── .render.yaml          # Render service config
+```
+
+## The prompt data
+
+All built-in prompts live in [`rpg_generator.json`](rpg_generator.json):
+
+```json
 {
-  "Main Topic" : {
-    "Sub Topic" : [
+  "Category": {
+    "Table": [
       "Entry 1",
-      ...
-    ] 
-  },
-  ...
+      "Entry 2"
+    ]
+  }
 }
 ```
 
-To add a new Main / Sub Topic, simply add a object / collection into the json file, either at the end or a middle of Json Collections.
+To add prompts, add entries to an existing table, or add a new table or category anywhere in the file. New categories get a default icon; add an icon and blurb for them in [`catalog.py`](catalog.py).
 
-## Using Your Own Tables (no upload to the server)
-On the generator page, **Customize** lets each user tailor the tables without changing them for anyone else:
+| Category | Tables | Prompts | About |
+|----------|-------:|--------:|-------|
+| 🧱 Dungeon | 7 | 533 | Puzzles, traps, riddles and hidden doors for when the party heads underground. |
+| 🛡️ Encounter | 8 | 800 | Things the party runs into on the road, sorted by terrain. |
+| 💎 Items | 29 | 2,958 | Trinkets, treasures, potions and pocket contents, useful or otherwise. |
+| ✨ Misc | 23 | 2,298 | Curses, diseases, plot twists, boons and other improvised flair. |
+| 👥 NPCs | 16 | 1,525 | "Who's that?" Shopkeepers, villains, familiars and their secrets. |
+| 🗺️ Quests | 9 | 895 | Hooks, side quests and travel events for when the party goes off-script. |
+| 🏠 Town | 16 | 1,505 | Taverns, laws, festivals and factions to make a settlement feel lived-in. |
 
-- **Show or hide tables**: tick the tables you want on `/cards`. Stored in the browser's localStorage.
-- **Load your own JSON** (same structure as above), either *added to the defaults* (new tables are added, entries for an existing table are appended) or *replacing the defaults*. The file is validated in the browser and stored in IndexedDB. It is never sent to the server, so rolling, searching and Quick builds run in the browser while custom data is active.
-- **Download the defaults as a template** (`/api/getall`), **Export** your file, or **Remove** it to go back to the built-in tables.
-- **Make your own Quick builds** from the Quick builds view: name it, pick an icon, and add lines (a label plus a category and table). Copy a built-in build to start from it. Builds are stored in IndexedDB as `[{ id, title, icon, parts: [{ label, category, sub }] }]`, the same part shape as `/api/combos`.
+## Your own tables and builds
 
-Because the data lives in that browser only, it doesn't sync between devices and is lost if site data is cleared. Export keeps a copy.
+Everything below is stored **only in the user's browser**. The server never sees it, and there are no accounts.
 
-## Topics
-|Topic      |Sub Topics               |About                              |
-|-----------|-------------------------|-----------------------------------|
-|Dungeon    |Puzzles, Hidden Doors, Traps, Curiosities, Riddles, Defenses.|Ideas for inpromptu hazards and challenges usually encountered in a dungeon.|
-|Encounter  |Aerial, Beach, Desert, Forest, Jungle, Snow, Spooky and Tavern Encounters.|Enemies for combat encouters to suit the location. |
-|Items      |Artifacts, Gifts, Instruments, Items, Objects, Potions, Treasures and more.|Useful, or unuseful, items to encounters on your adventures.|
-|Misc       |Journey Starting Points, Odd Occurrences, Punishment, Scenarios, Side Effects and more.|Random snippets to make use during a campaign to add some improvised flair.|
-|NPCs       |Characters, Creatures, Enemies, Familiars, Villagers, Villians and more.|Non-Playable-Characters to encounter while out and about and your party ask "Who's that person?".|
-|Quests     |Complications, Encounters, Events, Hooks, Legends, Point of Interest, Quests|Objectives for when the players decide to not follow the main quest and you need to think of something on the fly.|
-|Town       |Factions, Festivals, Games, Inns, Islands, Laws, Stalls, Taverns and more.|That extra bit to help your settlements feel more fleshed out.|
+**Customize** (button in the generator's header):
 
-## TODO
-- Create users
-- Create users login
-- Allow jsons to be editable
+- **Show or hide tables** individually or by category. Hidden tables also drop out of search, Surprise me and Quick builds. *(localStorage)*
+- **Load your own JSON** in the format above. Choose **Add to the defaults** (new tables are added, and entries for an existing table are appended without duplicates) or **Replace the defaults**. Files are validated in the browser with readable error messages. *(IndexedDB)*
+- **Pick an icon** for each category in your file.
+- **Download the defaults as a template**, **Export** your file, or **Remove** it.
+
+While custom data is active, rolling, searching and Quick builds run entirely in the browser.
+
+**Custom Quick builds** (from the Quick builds view): name it, pick an icon, and add up to 12 lines, each a label plus a category and table. They're stored in IndexedDB using the same line shape as the built-in builds:
+
+```json
+[
+  {
+    "id": "u-mw3c0mv0f4yg8",
+    "title": "Tavern Regular",
+    "icon": "cup-straw",
+    "parts": [
+      { "label": "Job",   "category": "NPCs", "sub": "Occupations" },
+      { "label": "Quirk", "category": "NPCs", "sub": "Personality Traits" }
+    ]
+  }
+]
+```
+
+> [!NOTE]
+> Browser storage doesn't sync between devices and is cleared along with the site's data. Use **Export** to keep a copy of your custom tables.
+
+## API
+
+All endpoints are `GET` and return JSON.
+
+| Endpoint | Returns |
+|----------|---------|
+| `/api/structure` | Categories with icon, blurb, totals and tables (no entry text) |
+| `/api/random` | A random entry from a random table: `{category, sub, text}`. Optional `?category=` |
+| `/api/r/<category>?arg=<table>` | A random entry from one table |
+| `/api/<category>?arg=<table>` | Every entry in a table (add `&id=<n>` for one entry) |
+| `/api/search?q=<text>&limit=<n>` | Matching entries: `{total, results: [{category, sub, index, text}]}` (limit up to 200) |
+| `/api/combos` | Built-in Quick build recipes |
+| `/api/combos/<id>` | A rolled Quick build |
+| `/api/getall` | The full dataset, in file order (also used as the upload template) |
+| `/api/Headings`, `/api/SubHeadings?category=`, `/api/EntryCount` | Legacy helpers kept for compatibility |
+
+Unknown categories, tables or ids return `404`.
+
+## Deployment
+
+The app is deployed on [Render](https://render.com/) and redeploys automatically on every push to `main`:
+
+- **Build:** `pip install -r requirements.txt`
+- **Start:** `gunicorn main:app` (see [`procfile`](procfile) and [`.render.yaml`](.render.yaml))
+
+## Roadmap
+
+- [x] Homepage
+- [x] Redesigned generator: categories, search, pins and history
+- [x] Quick builds, plus your own custom builds
+- [x] Custom JSON tables and show/hide, kept in the browser
+- [ ] Dice roller tool
+- [ ] Edit tables directly in the browser
+- [ ] Optional accounts to sync tables and builds across devices
