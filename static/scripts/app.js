@@ -1,6 +1,7 @@
 // D&D Prompt Helper – cards page (ES module)
 import {
     api, customData, createSource, parseCustomJson, ValidationError, downloadJson, MAX_FILE_BYTES,
+    ICON_CHOICES, iconFor,
 } from './data.js';
 
 {
@@ -743,6 +744,8 @@ import {
         messages: $('cz-messages'),
         exportBtn: $('cz-export'),
         resetBtn: $('cz-reset'),
+        iconsSection: $('cz-icons-section'),
+        icons: $('cz-icons'),
         visList: $('cz-vis-list'),
         visCount: $('cz-vis-count'),
         visFilter: $('cz-vis-filter'),
@@ -779,7 +782,65 @@ import {
         const mode = custom ? custom.mode : pendingMode;
         for (const radio of cz.modes()) radio.checked = radio.value === mode;
         cz.exportBtn.hidden = cz.resetBtn.hidden = !custom;
+        renderIcons();
         renderVisibility();
+    }
+
+    // ---------- Category icon picker ----------
+    let openPicker = null; // category whose picker is expanded
+
+    function renderIcons() {
+        cz.iconsSection.hidden = !custom;
+        if (!custom) { cz.icons.replaceChildren(); return; }
+        const label = (name) => name.replace(/-/g, ' ');
+        cz.icons.replaceChildren(...Object.keys(custom.data).map((cat) => {
+            const currentIcon = iconFor(cat, custom, serverStructure);
+            const picked = !!custom.icons?.[cat];
+            const isOpen = openPicker === cat;
+            const pickerId = 'cz-picker-' + cat.replace(/[^a-z0-9]+/gi, '-');
+            return el('div', { class: 'cz-icon-row' + (isOpen ? ' is-open' : '') },
+                el('button', {
+                    type: 'button',
+                    class: 'cz-icon-current',
+                    'aria-expanded': String(isOpen),
+                    'aria-controls': pickerId,
+                    title: 'Change the icon for ' + cat,
+                    onclick: () => { openPicker = isOpen ? null : cat; renderIcons(); },
+                },
+                    el('span', { class: 'cz-icon-swatch' }, icon(currentIcon)),
+                    el('span', { class: 'cz-icon-name', text: cat }),
+                    el('span', { class: 'cz-icon-change', text: isOpen ? 'Done' : 'Change' })),
+                isOpen ? el('div', { class: 'cz-icon-picker', id: pickerId, role: 'group', 'aria-label': 'Icons for ' + cat },
+                    el('div', { class: 'cz-icon-grid' }, ...ICON_CHOICES.map((name) => el('button', {
+                        type: 'button',
+                        class: 'cz-icon-option' + (name === currentIcon ? ' is-selected' : ''),
+                        title: label(name),
+                        'aria-label': label(name),
+                        'aria-pressed': String(name === currentIcon),
+                        onclick: () => setCategoryIcon(cat, name),
+                    }, icon(name)))),
+                    picked ? el('button', { type: 'button', class: 'link-btn', onclick: () => setCategoryIcon(cat, null), text: 'Use the default icon' }) : null)
+                    : null);
+        }));
+    }
+
+    async function setCategoryIcon(cat, iconName) {
+        const icons = { ...(custom.icons || {}) };
+        if (iconName) icons[cat] = iconName;
+        else delete icons[cat];
+        const record = { ...custom, icons };
+        try {
+            await customData.save(record);
+        } catch (err) {
+            showMessages('error', 'Could not save the icon.', [err.message || String(err)]);
+            return;
+        }
+        custom = record;
+        // Patch the icon in place; no need to rebuild the source (merge mode would refetch the defaults)
+        const entry = allStructure.find((c) => c.name === cat);
+        if (entry) entry.icon = iconFor(cat, custom, serverStructure);
+        refresh();
+        renderIcons();
     }
 
     let pendingMode = 'merge';
@@ -830,8 +891,12 @@ import {
             else showMessages('error', 'That file couldn’t be read.', [err.message]);
             return;
         }
+        // Keep icon choices for categories that are still in the new file
+        const icons = Object.fromEntries(Object.entries(custom?.icons || {}).filter(([cat]) => cat in parsed.data));
+        openPicker = null;
         const ok = await applyCustom({
             mode: pendingMode,
+            icons,
             name: file.name,
             uploadedAt: new Date().toISOString(),
             data: parsed.data,

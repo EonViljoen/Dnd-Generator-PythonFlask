@@ -8,6 +8,21 @@
 // to the server.
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+// Icons users can pick for their own categories (Bootstrap Icons names, all present in v1.11.3)
+export const DEFAULT_CUSTOM_ICON = 'journal-bookmark';
+export const ICON_CHOICES = [
+    'journal-bookmark', 'book', 'book-half', 'bookmark-star', 'dice-5', 'dice-3', 'puzzle', 'magic',
+    'stars', 'star', 'moon-stars', 'moon', 'sun', 'fire', 'droplet', 'snow', 'cloud-lightning', 'tornado',
+    'tsunami', 'tree', 'flower1', 'bricks', 'door-closed', 'key', 'lock', 'map', 'compass', 'signpost-split',
+    'geo-alt', 'globe', 'binoculars', 'house-door', 'buildings', 'shop', 'cup-straw', 'cup-hot',
+    'music-note-beamed', 'palette', 'cart', 'bag', 'basket', 'gift', 'coin', 'cash-coin', 'gem', 'trophy',
+    'award', 'shield-shaded', 'shield', 'crosshair', 'bullseye', 'hammer', 'tools', 'flag', 'lightning-charge',
+    'people', 'person', 'person-badge', 'incognito', 'mask', 'emoji-angry', 'emoji-smile', 'heart',
+    'heartbreak', 'eye', 'feather', 'bug', 'virus', 'capsule', 'radioactive', 'hourglass-split', 'bell',
+    'chat-quote', 'envelope-paper',
+];
+const ICON_SET = new Set(ICON_CHOICES);
 const MAX_NAME_LENGTH = 120;
 const MAX_REPORTED_ISSUES = 8;
 
@@ -59,7 +74,8 @@ export const storage = {
 };
 
 // ---------- Custom data ----------
-// Stored shape: { mode: 'merge' | 'replace', name, uploadedAt, data, tables, prompts }
+// Stored shape: { mode: 'merge' | 'replace', name, uploadedAt, data, tables, prompts,
+//                 icons: { categoryName: iconName } }
 const CUSTOM_KEY = 'custom';
 
 export const customData = {
@@ -200,7 +216,7 @@ export class LocalSource {
             const subcategories = Object.entries(subs).map(([sub, entries]) => ({ name: sub, count: entries.length }));
             return {
                 name,
-                icon: meta[name]?.icon || 'journal-bookmark',
+                icon: meta[name]?.icon || DEFAULT_CUSTOM_ICON,
                 blurb: meta[name]?.blurb || '',
                 total: subcategories.reduce((n, s) => n + s.count, 0),
                 subcategories,
@@ -236,10 +252,20 @@ export class LocalSource {
     }
 }
 
+// Icon chosen for a category: the user's pick, else the built-in icon, else the default
+export function iconFor(category, custom, serverStructure) {
+    const picked = custom?.icons?.[category];
+    if (picked && ICON_SET.has(picked)) return picked;
+    return serverStructure.find((c) => c.name === category)?.icon || DEFAULT_CUSTOM_ICON;
+}
+
 // Pick the source for the stored custom data (or the server if there is none).
 export async function createSource(custom, serverStructure) {
     if (!custom) return new ServerSource(serverStructure);
-    const meta = Object.fromEntries(serverStructure.map((c) => [c.name, c]));
+    const meta = Object.fromEntries(serverStructure.map((c) => [c.name, { ...c }]));
+    for (const cat of Object.keys(custom.data)) {
+        meta[cat] = { ...meta[cat], icon: iconFor(cat, custom, serverStructure) };
+    }
     if (custom.mode === 'replace') return new LocalSource(custom.data, meta);
     const base = await api(['getall']);
     return new LocalSource(mergeData(base, custom.data), meta);

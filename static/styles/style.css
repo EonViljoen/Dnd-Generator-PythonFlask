@@ -1252,3 +1252,68 @@ button:disabled.btn-surprise { opacity: 0.4; cursor: not-allowed; }
     .custom-ctas .btn-gold,
     .custom-ctas .btn-outline-gold { width: 100%; white-space: normal; }
 }
+
+/* Customize: category icon picker */
+.cz-sub { color: var(--muted); font-size: 0.85rem; margin: -0.35rem 0 0.75rem; }
+.cz-icons { display: flex; flex-direction: column; gap: 0.5rem; }
+.cz-icon-row {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.cz-icon-row.is-open { border-color: var(--border-strong); }
+.cz-icon-current {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: none;
+    border: 0;
+    color: var(--text);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+}
+.cz-icon-current:hover { background: var(--surface-2); }
+.cz-icon-swatch {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--gold-soft);
+    color: var(--gold);
+    font-size: 1.1rem;
+    flex: none;
+}
+.cz-icon-name { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cz-icon-change { font-size: 0.8rem; color: var(--gold); }
+.cz-icon-picker {
+    padding: 0.6rem 0.75rem 0.75rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+}
+.cz-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+    gap: 0.3rem;
+    margin-bottom: 0.4rem;
+}
+.cz-icon-option {
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--muted);
+    font-size: 1.05rem;
+    padding: 0;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.cz-icon-option:hover { color: var(--text); border-color: var(--border-strong); }
+.cz-icon-option.is-selected {
+    color: #1a140f;
+    background: var(--gold);
+    border-color: var(--gold);
+}
+.cz-icon-picker .link-btn { margin: 0.2rem 0 0; }
