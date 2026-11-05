@@ -32,5 +32,11 @@
     {% block content %}{% endblock %}
 
     {% block scripts %}{% endblock %}
+    <script>
+      // Keep a copy of the site so it opens instantly while the free server wakes up (see static/sw.js)
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
+      }
+    </script>
   </body>
 </html>

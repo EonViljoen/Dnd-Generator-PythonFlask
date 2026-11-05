@@ -2272,3 +2272,80 @@ select.be-input { appearance: auto; }
 .theme-reset { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--muted); }
 .theme-base { width: auto; padding: 0.3rem 0.5rem; }
 .theme-warning { margin: 0; }
+
+/* =========================================================
+   Wake-up screen (free server cold start)
+   ========================================================= */
+.wake-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+    display: grid;
+    place-items: center;
+    padding: 1.25rem;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(6px);
+    animation: wake-in 0.25s ease-out;
+    transition: opacity 0.3s;
+}
+.wake-screen[hidden] { display: none; }
+.wake-screen.is-done { opacity: 0; }
+.wake-card {
+    width: min(420px, 100%);
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-radius: 16px;
+    padding: 2rem 1.75rem 1.5rem;
+    box-shadow: 0 20px 50px var(--shadow);
+}
+.wake-die {
+    display: inline-block;
+    font-size: 2.6rem;
+    color: var(--gold);
+    animation: wake-roll 1.6s ease-in-out infinite;
+}
+.wake-title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.35rem;
+    margin: 0.75rem 0 0.5rem;
+}
+.wake-text { color: var(--muted); margin: 0 0 1.1rem; line-height: 1.5; }
+.wake-bar {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--surface-3);
+    overflow: hidden;
+}
+.wake-bar span {
+    display: block;
+    width: 35%;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--gold);
+    animation: wake-slide 1.4s ease-in-out infinite;
+}
+.wake-elapsed {
+    margin: 0.6rem 0 0;
+    font-size: 0.8rem;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+    min-height: 1.2em;
+}
+.wake-screen.is-failed .wake-die { animation: none; color: var(--faint); }
+.wake-screen.is-failed .wake-bar { display: none; }
+.wake-screen #wake-retry { margin-top: 0.75rem; }
+.wake-screen #wake-retry[hidden] { display: none; }
+
+@keyframes wake-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wake-roll {
+    0%   { transform: rotate(0) translateY(0); }
+    30%  { transform: rotate(-20deg) translateY(-6px); }
+    60%  { transform: rotate(200deg) translateY(0); }
+    100% { transform: rotate(360deg) translateY(0); }
+}
+@keyframes wake-slide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(290%); }
+}

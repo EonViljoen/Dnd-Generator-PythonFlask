@@ -215,6 +215,7 @@ node --test tests/*.test.mjs
 │   │   ├── data.js       # Data layer: server/local sources, IndexedDB, validation
 │   │   ├── dice.js       # Dice notation parser and fair roller (no DOM, testable in Node)
 │   │   └── initiative.js # Initiative tracker state: order, turns, HP, conditions (no DOM)
+│   ├── sw.js             # Service worker: instant pages during Render cold starts
 │   ├── styles/style.css  # Theme and layout
 │   └── images/           # Favicon (SVG, ICO) and Apple touch icon
 ├── tests/                # Node tests for the dice engine and initiative tracker
@@ -308,6 +309,8 @@ The app is deployed on [Render](https://render.com/) and redeploys automatically
 
 - **Build:** `pip install -r requirements.txt`
 - **Start:** `gunicorn main:app` (see [`procfile`](procfile) and [`.render.yaml`](.render.yaml))
+
+**Cold starts:** Render's free tier puts the server to sleep when idle, and waking it can take up to a minute. A service worker ([`static/sw.js`](static/sw.js)) keeps a copy of the pages, so returning visitors get the page straight away and see a *"Waking up the tavern…"* screen that retries until the API answers, then carries on by itself. A visitor's very first visit still waits for the server.
 
 ## Roadmap
 

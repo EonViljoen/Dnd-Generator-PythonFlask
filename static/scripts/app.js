@@ -2275,11 +2275,55 @@ import * as Init from './initiative.js';
         toast('Deleted “' + existing.title + '”');
     });
 
+    // ---------- Waking the server ----------
+    // The free Render server sleeps when idle. The page may come from the service worker's saved
+    // copy (sw.js) while the API is still starting, so: show a friendly screen if loading takes
+    // more than a moment, and keep retrying until the server answers (up to 2 minutes).
+    const WAKE_LIMIT_MS = 120000;
+    const wake = { screen: $('wake-screen'), title: $('wake-title'), text: $('wake-text'), elapsed: $('wake-elapsed'), retry: $('wake-retry') };
+    wake.retry.addEventListener('click', () => location.reload());
+
+    async function whenServerReady(load) {
+        const started = Date.now();
+        const showTimer = setTimeout(() => { wake.screen.hidden = false; }, 800);
+        const tick = setInterval(() => {
+            const s = Math.round((Date.now() - started) / 1000);
+            wake.elapsed.textContent = s < 60 ? s + 's' : Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+        }, 1000);
+        try {
+            for (let attempt = 0; ; attempt++) {
+                try {
+                    return await load();
+                } catch (err) {
+                    if (Date.now() - started > WAKE_LIMIT_MS) throw err;
+                    await new Promise((r) => setTimeout(r, Math.min(1500 + attempt * 1000, 5000)));
+                }
+            }
+        } finally {
+            clearTimeout(showTimer);
+            clearInterval(tick);
+            if (!wake.screen.hidden && wake.retry.hidden) {
+                wake.screen.classList.add('is-done');
+                setTimeout(() => { wake.screen.hidden = true; wake.screen.classList.remove('is-done'); }, 350);
+            }
+        }
+    }
+
+    function showWakeFailure() {
+        wake.screen.hidden = false;
+        wake.screen.classList.add('is-failed');
+        wake.title.textContent = 'The tavern is still closed';
+        wake.text.textContent = 'The server didn’t wake up in time. It may be restarting, or you may be offline.';
+        wake.elapsed.textContent = '';
+        wake.retry.hidden = false;
+        wake.retry.focus();
+    }
+
     // ---------- Init ----------
     const pendingShare = takeShareToken();
     renderPins();
     renderHistory();
-    Promise.all([api(['structure']), api(['combos']).catch(() => [])])
+    whenServerReady(() => Promise.all([api(['structure']), api(['combos']).catch(() => [])]))
         .then(async ([data, comboList]) => {
             serverStructure = data;
             serverRecipes = comboList;
@@ -2308,6 +2352,7 @@ import * as Init from './initiative.js';
         })
         .catch((err) => {
             fill(els.content, el('div', { class: 'empty-state', text: 'Could not load categories (' + err.message + '). Refresh to try again.' }));
+            showWakeFailure();
         });
 
     window.addEventListener('hashchange', () => {

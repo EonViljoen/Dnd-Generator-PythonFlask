@@ -257,6 +257,18 @@
       </div>
     </div>
 
+    <!-- Shown while the free Render server wakes up from sleep -->
+    <div class="wake-screen" id="wake-screen" role="status" aria-live="polite" hidden>
+      <div class="wake-card">
+        <i class="bi bi-dice-5 wake-die" aria-hidden="true"></i>
+        <h2 class="wake-title" id="wake-title">Waking up the tavern…</h2>
+        <p class="wake-text" id="wake-text">The free server naps when no one's around. The first visit after a while can take up to a minute. Thanks for waiting!</p>
+        <div class="wake-bar" aria-hidden="true"><span></span></div>
+        <p class="wake-elapsed" id="wake-elapsed"></p>
+        <button type="button" class="btn-gold" id="wake-retry" hidden><i class="bi bi-arrow-clockwise"></i> Try again</button>
+      </div>
+    </div>
+
     <div class="copy-toast" id="copy-toast" role="status" aria-live="polite"></div>
 
 {% endblock %}
