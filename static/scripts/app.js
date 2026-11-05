@@ -7,22 +7,16 @@
     const HISTORY_LIMIT = 10;
     const MIN_TEXT_SEARCH = 3;
 
-    const CATEGORY_META = {
-        Dungeon:   { icon: 'bricks',        blurb: 'Puzzles, traps, riddles and hidden doors for when the party heads underground.' },
-        Encounter: { icon: 'shield-shaded', blurb: 'Things the party runs into on the road, sorted by terrain.' },
-        Items:     { icon: 'gem',           blurb: 'Trinkets, treasures, potions and pocket contents — useful or otherwise.' },
-        Misc:      { icon: 'stars',         blurb: 'Curses, diseases, plot twists, boons and other improvised flair.' },
-        NPCs:      { icon: 'people',        blurb: '“Who’s that?” Shopkeepers, villains, familiars and their secrets.' },
-        Quests:    { icon: 'map',           blurb: 'Hooks, side quests and travel events for when the party goes off-script.' },
-        Town:      { icon: 'house-door',    blurb: 'Taverns, laws, festivals and factions to make a settlement feel lived-in.' },
-    };
-    const metaFor = (name) => CATEGORY_META[name] || { icon: 'dice-5', blurb: '' };
+    const QUICK_HASH = 'quick-builds';
+    const QUICK_LABEL = 'Quick build';
+
 
     const $ = (id) => document.getElementById(id);
     const els = {
         nav: $('cat-nav-list'),
         content: $('content'),
         search: $('search-input'),
+        surprise: $('btn-surprise'),
         searchForm: $('search-form'),
         panel: $('result-panel'),
         crumb: $('result-crumb'),
@@ -45,9 +39,10 @@
     };
 
     let structure = [];
-    let view = null;          // { type: 'category', name } | { type: 'search', q }
+    let combos = [];
+    let view = null;          // { type: 'category', name } | { type: 'combos' } | { type: 'search', q }
     let lastCategory = null;
-    let current = null;       // { category, sub, text }
+    let current = null;       // { category, sub, text } or a combo: { comboId, category, sub, text, parts }
     let activeKey = null;     // "category|sub" of the last rolled table
     let rollSeq = 0;          // ignore stale roll responses
     let searchSeq = 0;        // ignore stale search responses
@@ -116,22 +111,42 @@
     }
 
     // ---------- Navigation ----------
+    function navButton({ iconName, label, count, title, current, onclick, extraClass = '' }) {
+        return el('li', {},
+            el('button', {
+                type: 'button',
+                class: ('cat-btn ' + extraClass).trim(),
+                'aria-current': current ? 'true' : 'false',
+                title,
+                onclick,
+            },
+                icon(iconName),
+                el('span', { text: label }),
+                count !== undefined ? el('span', { class: 'cat-count', text: count }) : null));
+    }
+
     function renderNav() {
-        els.nav.replaceChildren(...structure.map((cat) => {
-            const total = cat.subcategories.reduce((n, s) => n + s.count, 0);
-            const isCurrent = view && view.type === 'category' && view.name === cat.name;
-            return el('li', {},
-                el('button', {
-                    type: 'button',
-                    class: 'cat-btn',
-                    'aria-current': isCurrent ? 'true' : 'false',
-                    title: plural(total, 'prompt'),
-                    onclick: () => goToCategory(cat.name),
-                },
-                    icon(metaFor(cat.name).icon),
-                    el('span', { text: cat.name }),
-                    el('span', { class: 'cat-count', text: cat.subcategories.length })));
+        const items = structure.map((cat) => navButton({
+            iconName: cat.icon,
+            label: cat.name,
+            count: cat.subcategories.length,
+            title: plural(cat.total, 'prompt'),
+            current: view && view.type === 'category' && view.name === cat.name,
+            onclick: () => goToCategory(cat.name),
         }));
+        if (combos.length) {
+            items.push(el('li', { class: 'cat-nav-sep', 'aria-hidden': 'true' }));
+            items.push(navButton({
+                iconName: 'lightning-charge',
+                label: 'Quick builds',
+                count: combos.length,
+                title: 'Roll several tables at once',
+                current: view && view.type === 'combos',
+                onclick: goToCombos,
+                extraClass: 'cat-btn-quick',
+            }));
+        }
+        els.nav.replaceChildren(...items);
         const currentBtn = els.nav.querySelector('[aria-current="true"]');
         if (currentBtn) currentBtn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
@@ -145,9 +160,17 @@
     // Replace rather than push so the back button leaves the page instead of cycling tabs
     const history_replace = (hash) => window.history.replaceState(null, '', hash);
 
-    function categoryFromHash() {
+    function goToCombos() {
+        if (els.search.value) els.search.value = '';
+        if (location.hash !== '#' + QUICK_HASH) history_replace('#' + QUICK_HASH);
+        setView({ type: 'combos' });
+    }
+
+    // View named by the URL hash, or null if it doesn't match anything
+    function viewFromHash() {
         const name = decodeURIComponent(location.hash.slice(1));
-        return structure.some((c) => c.name === name) ? name : null;
+        if (name === QUICK_HASH && combos.length) return { type: 'combos' };
+        return structure.some((c) => c.name === name) ? { type: 'category', name } : null;
     }
 
     function setView(next) {
@@ -160,17 +183,24 @@
     // ---------- Content ----------
     function renderContent() {
         if (view.type === 'category') renderCategory(view.name);
+        else if (view.type === 'combos') renderCombos();
         else renderSearch(view.q);
     }
 
     function renderCategory(name) {
         const cat = structure.find((c) => c.name === name);
-        const total = cat.subcategories.reduce((n, s) => n + s.count, 0);
         els.content.replaceChildren(
-            el('div', { class: 'content-head' },
-                el('div', { class: 'content-kicker', text: plural(cat.subcategories.length, 'table') + ' · ' + plural(total, 'prompt') }),
-                el('h1', { class: 'content-title', text: cat.name }),
-                el('p', { class: 'content-blurb', text: metaFor(cat.name).blurb })),
+            el('div', { class: 'content-head content-head-split' },
+                el('div', {},
+                    el('div', { class: 'content-kicker', text: plural(cat.subcategories.length, 'table') + ' · ' + plural(cat.total, 'prompt') }),
+                    el('h1', { class: 'content-title', text: cat.name }),
+                    el('p', { class: 'content-blurb', text: cat.blurb })),
+                el('button', {
+                    type: 'button',
+                    class: 'btn-outline-gold',
+                    title: 'Roll on a random ' + cat.name + ' table',
+                    onclick: () => rollRandomTable(cat),
+                }, icon('shuffle'), el('span', { text: 'Roll any table' }))),
             el('div', { class: 'tiles' }, ...cat.subcategories.map((sub) => renderTile(cat.name, sub))));
     }
 
@@ -196,8 +226,78 @@
     }
 
     function markActiveTile() {
-        for (const tile of els.content.querySelectorAll('.tile')) {
+        for (const tile of els.content.querySelectorAll('.tile, .combo-card')) {
             tile.classList.toggle('active', tile.dataset.key === activeKey);
+        }
+    }
+
+    // ---------- Quick builds ----------
+    function renderCombos() {
+        els.content.replaceChildren(
+            el('div', { class: 'content-head' },
+                el('div', { class: 'content-kicker', text: plural(combos.length, 'generator') }),
+                el('h1', { class: 'content-title', text: 'Quick builds' }),
+                el('p', { class: 'content-blurb', text: 'Roll several tables at once for a ready-to-use NPC, tavern, town and more. Reroll any single line you don’t like.' })),
+            el('div', { class: 'combo-grid' }, ...combos.map(renderComboCard)));
+    }
+
+    function renderComboCard(combo) {
+        return el('article', { class: 'combo-card' + (activeKey === 'combo|' + combo.id ? ' active' : ''), 'data-key': 'combo|' + combo.id },
+            el('div', { class: 'combo-head' },
+                el('span', { class: 'combo-icon' }, icon(combo.icon)),
+                el('h2', { class: 'combo-title', text: combo.title })),
+            el('p', { class: 'combo-blurb', text: combo.blurb }),
+            el('ul', { class: 'combo-parts' }, ...combo.parts.map((p) =>
+                el('li', { title: p.category + ' › ' + p.sub, text: p.label }))),
+            el('button', {
+                type: 'button',
+                class: 'btn-gold',
+                onclick: () => rollCombo(combo.id),
+            }, icon('dice-5'), el('span', { text: 'Roll ' + combo.title.replace(/^Quick /, '') })));
+    }
+
+    const comboText = (parts) => parts.map((p) => p.label + ': ' + p.text).join('\n\n');
+
+    function comboItem(id, title, parts) {
+        return { comboId: id, category: QUICK_LABEL, sub: title, parts, text: comboText(parts) };
+    }
+
+    async function rollCombo(id) {
+        const seq = ++rollSeq;
+        activeKey = 'combo|' + id;
+        markActiveTile();
+        startRolling();
+        try {
+            const data = await api(['combos', id]);
+            if (seq !== rollSeq) return;
+            const item = comboItem(data.id, data.title, data.parts);
+            showResult(item, { animate: true });
+            addToHistory(item);
+        } catch (err) {
+            if (seq === rollSeq) showRollError(QUICK_LABEL, id, err);
+        } finally {
+            if (seq === rollSeq) els.panel.classList.remove('loading');
+        }
+    }
+
+    async function rerollPart(index) {
+        if (!current || !current.parts) return;
+        const before = current;
+        const part = before.parts[index];
+        const row = els.text.querySelectorAll('.result-part')[index];
+        if (row) row.classList.add('loading');
+        try {
+            const text = await api(['r', part.category], { arg: part.sub });
+            if (current !== before) return; // something else was shown meanwhile
+            const parts = before.parts.map((p, i) => (i === index ? { ...p, text } : p));
+            const item = comboItem(before.comboId, before.sub, parts);
+            history = history.map((h) => (sameItem(h, before) ? item : h));
+            save(HISTORY_KEY, history);
+            renderHistory();
+            showResult(item, { animatePart: index });
+        } catch (err) {
+            if (row) row.classList.remove('loading');
+            toast('Could not reroll (' + err.message + ')');
         }
     }
 
@@ -280,26 +380,46 @@
         const seq = ++rollSeq;
         activeKey = keyOf(category, sub);
         markActiveTile();
-        els.panel.classList.add('loading');
-        restartAnimation('rolling');
-        expandPanel();
+        startRolling();
         try {
             const text = await api(['r', category], { arg: sub });
             if (seq !== rollSeq) return;
             const item = { category, sub, text };
             showResult(item, { animate: true });
-            history = [item, ...history.filter((h) => !sameItem(h, item))].slice(0, HISTORY_LIMIT);
-            save(HISTORY_KEY, history);
-            renderHistory();
+            addToHistory(item);
         } catch (err) {
-            if (seq !== rollSeq) return;
-            els.crumb.textContent = category + ' › ' + sub;
-            els.text.textContent = 'The dice rolled off the table (' + err.message + '). Try again.';
-            els.text.className = 'result-text is-error';
+            if (seq === rollSeq) showRollError(category, sub, err);
         } finally {
             if (seq === rollSeq) els.panel.classList.remove('loading');
         }
     }
+
+    function startRolling() {
+        els.panel.classList.add('loading');
+        restartAnimation('rolling');
+        expandPanel();
+    }
+
+    function showRollError(category, sub, err) {
+        els.crumb.textContent = category + ' › ' + sub;
+        els.text.textContent = 'The dice rolled off the table (' + err.message + '). Try again.';
+        els.text.className = 'result-text is-error';
+    }
+
+    function addToHistory(item) {
+        history = [item, ...history.filter((h) => !sameItem(h, item))].slice(0, HISTORY_LIMIT);
+        save(HISTORY_KEY, history);
+        renderHistory();
+    }
+
+    // Uniform over tables (not entries), so small tables come up as often as big ones
+    function rollRandomTable(cat) {
+        const tables = (cat ? [cat] : structure).flatMap((c) => c.subcategories.map((s) => [c.name, s.name]));
+        if (!tables.length) return;
+        const [category, sub] = tables[Math.floor(Math.random() * tables.length)];
+        roll(category, sub);
+    }
+    els.surprise.addEventListener('click', () => rollRandomTable());
 
     function restartAnimation(cls) {
         els.panel.classList.remove(cls);
@@ -307,20 +427,38 @@
         els.panel.classList.add(cls);
     }
 
-    function showResult(item, { animate = false } = {}) {
+    function showResult(item, { animate = false, animatePart = -1 } = {}) {
         current = item;
         els.crumb.textContent = crumbOf(item);
-        els.text.textContent = item.text;
         els.text.className = 'result-text';
+        if (item.parts) {
+            els.text.replaceChildren(el('dl', { class: 'result-parts' }, ...item.parts.map((p, i) =>
+                el('div', { class: 'result-part' + (i === animatePart ? ' revealed' : '') },
+                    el('dt', {},
+                        el('span', { text: p.label }),
+                        el('button', {
+                            type: 'button',
+                            class: 'part-reroll',
+                            title: 'Reroll ' + p.label.toLowerCase(),
+                            'aria-label': 'Reroll ' + p.label.toLowerCase(),
+                            onclick: () => rerollPart(i),
+                        }, icon('arrow-repeat'))),
+                    el('dd', { text: p.text })))));
+        } else {
+            els.text.textContent = item.text;
+        }
         if (animate) restartAnimation('revealed');
         els.reroll.disabled = els.copy.disabled = els.pin.disabled = false;
         updatePinButton();
     }
 
     // ---------- Result actions ----------
-    els.reroll.addEventListener('click', () => {
-        if (current) roll(current.category, current.sub);
-    });
+    const rollAgain = () => {
+        if (!current) return;
+        if (current.comboId) rollCombo(current.comboId);
+        else roll(current.category, current.sub);
+    };
+    els.reroll.addEventListener('click', rollAgain);
 
     els.copy.addEventListener('click', () => current && copyAndToast(current.text));
 
@@ -370,14 +508,17 @@
     // Keyboard: R = roll again, / = focus search (ignored while typing or with a modal open)
     document.addEventListener('keydown', (e) => {
         if (e.metaKey || e.ctrlKey || e.altKey) return;
-        if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+        if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]')) return;
         if (document.querySelector('.modal.show')) return;
         if (e.key === '/') {
             e.preventDefault();
             els.search.focus();
         } else if (e.key.toLowerCase() === 'r' && current) {
             e.preventDefault();
-            roll(current.category, current.sub);
+            rollAgain();
+        } else if (e.key.toLowerCase() === 's' && structure.length) {
+            e.preventDefault();
+            rollRandomTable();
         }
     });
 
@@ -506,17 +647,20 @@
     // ---------- Init ----------
     renderPins();
     renderHistory();
-    api(['structure'])
-        .then((data) => {
+    Promise.all([api(['structure']), api(['combos']).catch(() => [])])
+        .then(([data, comboList]) => {
             structure = data;
-            setView({ type: 'category', name: categoryFromHash() || structure[0].name });
+            combos = comboList;
+            setView(viewFromHash() || { type: 'category', name: structure[0].name });
         })
         .catch((err) => {
             els.content.replaceChildren(el('div', { class: 'empty-state', text: 'Could not load categories (' + err.message + '). Refresh to try again.' }));
         });
 
     window.addEventListener('hashchange', () => {
-        const name = categoryFromHash();
-        if (name) goToCategory(name);
+        const next = viewFromHash();
+        if (!next) return;
+        if (next.type === 'combos') goToCombos();
+        else goToCategory(next.name);
     });
 })();

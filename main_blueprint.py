@@ -1,11 +1,18 @@
 from flask import Blueprint, render_template, current_app, send_from_directory
+from jsonReader import JsonReader
 
 
 main_blueprint = Blueprint('main', __name__)
 
 @main_blueprint.route('/', methods=['GET'])
 def Home():
-    return render_template('index.html')
+    return render_template(
+        'index.html',
+        stats=JsonReader.Stats(),
+        categories=JsonReader.GetStructure(),
+        combos=JsonReader.GetCombos(),
+        sample=JsonReader.RandomAny(),
+    )
 
 @main_blueprint.route('/cards', methods=['GET'])
 def Cards():

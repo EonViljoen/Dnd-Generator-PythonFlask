@@ -52,7 +52,6 @@ To add a new Main / Sub Topic, simply add a object / collection into the json fi
 |Town       |Factions, Festivals, Games, Inns, Islands, Laws, Stalls, Taverns and more.|That extra bit to help your settlements feel more fleshed out.|
 
 ## TODO
-- Create a Homepage
 - Create users
 - Create users login
 - Allow users to upload custom jsons in required format

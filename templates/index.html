@@ -1,17 +1,154 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>DnD Prompt Helper</title>
-    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" sizes="48x48">
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-    <link rel="stylesheet" href="{{ url_for('static',filename='styles/style.css') }}">
-  </head>
-  <body>
-    <h1>Home page coming soon....</h1>
-  </body>
-</html>
+{% extends "base.html" %}
+
+{% block body_class %}home-page{% endblock %}
+
+{% block header_extra %}
+        <a class="btn-gold header-cta" href="{{ url_for('main.Cards') }}">
+          <span>Open the generator</span> <i class="bi bi-arrow-right" aria-hidden="true"></i>
+        </a>
+{% endblock %}
+
+{% block content %}
+    <main class="home">
+      <!-- Hero -->
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="content-kicker">For dungeon masters who improvise</div>
+          <h1 class="hero-title">Never get caught without an answer.</h1>
+          <p class="hero-lead">
+            The party wants to know what's in the goblin's pockets, who runs the tavern,
+            or what that strange door does. Roll a prompt in one click and keep the game moving.
+          </p>
+          <div class="hero-ctas">
+            <a class="btn-gold btn-lg-gold" href="{{ url_for('main.Cards') }}">
+              <i class="bi bi-dice-5" aria-hidden="true"></i> Start rolling
+            </a>
+            <a class="btn-outline-gold btn-lg-gold" href="{{ url_for('main.Cards') }}#quick-builds">
+              <i class="bi bi-lightning-charge" aria-hidden="true"></i> Quick builds
+            </a>
+          </div>
+          <dl class="stats">
+            <div><dt>Prompts</dt><dd>{{ "{:,}".format(stats.prompts) }}</dd></div>
+            <div><dt>Tables</dt><dd>{{ stats.tables }}</dd></div>
+            <div><dt>Categories</dt><dd>{{ stats.categories }}</dd></div>
+          </dl>
+        </div>
+
+        <div class="hero-sample">
+          <section class="result-panel sample-panel" id="sample-panel" aria-live="polite">
+            <div class="result-meta">
+              <i class="bi bi-dice-5 result-die" aria-hidden="true"></i>
+              <span class="result-crumb" id="sample-crumb">{{ sample.category }} › {{ sample.sub }}</span>
+            </div>
+            <p class="result-text" id="sample-text">{{ sample.text }}</p>
+            <div class="result-actions">
+              <button type="button" class="btn-ink" id="sample-roll">
+                <i class="bi bi-shuffle" aria-hidden="true"></i> Roll another
+              </button>
+              <a class="btn-ink-outline" id="sample-open" href="{{ url_for('main.Cards') }}#{{ sample.category | urlencode }}">
+                Open table <i class="bi bi-arrow-right" aria-hidden="true"></i>
+              </a>
+            </div>
+          </section>
+          <p class="sample-caption">A random prompt from a random table. Try it.</p>
+        </div>
+      </section>
+
+      <!-- Categories -->
+      <section class="home-section">
+        <h2 class="home-heading">Browse by category</h2>
+        <div class="home-cats">
+          {% for cat in categories %}
+          <a class="home-cat" href="{{ url_for('main.Cards') }}#{{ cat.name | urlencode }}">
+            <span class="home-cat-icon"><i class="bi bi-{{ cat.icon }}" aria-hidden="true"></i></span>
+            <span class="home-cat-name">{{ cat.name }}</span>
+            <span class="home-cat-blurb">{{ cat.blurb }}</span>
+            <span class="home-cat-meta">{{ cat.subcategories | length }} tables · {{ "{:,}".format(cat.total) }} prompts</span>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- Quick builds -->
+      <section class="home-section">
+        <h2 class="home-heading">Quick builds</h2>
+        <p class="home-sub">Roll several tables at once, then reroll any line you don't like.</p>
+        <div class="combo-grid">
+          {% for combo in combos %}
+          <a class="combo-card combo-link" href="{{ url_for('main.Cards') }}#quick-builds">
+            <div class="combo-head">
+              <span class="combo-icon"><i class="bi bi-{{ combo.icon }}" aria-hidden="true"></i></span>
+              <h3 class="combo-title">{{ combo.title }}</h3>
+            </div>
+            <p class="combo-blurb">{{ combo.blurb }}</p>
+            <ul class="combo-parts">
+              {% for part in combo.parts %}<li>{{ part.label }}</li>{% endfor %}
+            </ul>
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="home-section">
+        <h2 class="home-heading">At the table</h2>
+        <ol class="steps">
+          <li>
+            <i class="bi bi-search" aria-hidden="true"></i>
+            <h3>Find a table</h3>
+            <p>Pick a category, or press <kbd>/</kbd> and search every table and prompt.</p>
+          </li>
+          <li>
+            <i class="bi bi-dice-5" aria-hidden="true"></i>
+            <h3>Roll</h3>
+            <p>Click a table to roll it. Press <kbd>R</kbd> to roll again, or <kbd>S</kbd> to roll on any table.</p>
+          </li>
+          <li>
+            <i class="bi bi-pin-angle" aria-hidden="true"></i>
+            <h3>Keep the good ones</h3>
+            <p>Pin prompts for tonight's session. Your last 10 rolls stay in this browser.</p>
+          </li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="home-footer">
+      <p>
+        Also available as a JSON API: <code>/api/structure</code>, <code>/api/random</code>,
+        <code>/api/search?q=…</code> and <code>/api/combos</code>.
+      </p>
+      <p>
+        <a href="https://github.com/EonViljoen/Dnd-Generator-PythonFlask">Source on GitHub</a>
+      </p>
+    </footer>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+      (() => {
+        const btn = document.getElementById('sample-roll');
+        const panel = document.getElementById('sample-panel');
+        const crumb = document.getElementById('sample-crumb');
+        const text = document.getElementById('sample-text');
+        const open = document.getElementById('sample-open');
+        const replay = (cls) => { panel.classList.remove(cls); void panel.offsetWidth; panel.classList.add(cls); };
+        btn.addEventListener('click', async () => {
+          panel.classList.add('loading');
+          replay('rolling');
+          try {
+            const res = await fetch('/api/random');
+            if (!res.ok) throw new Error(res.status);
+            const data = await res.json();
+            crumb.textContent = data.category + ' › ' + data.sub;
+            text.textContent = data.text;
+            open.href = '/cards#' + encodeURIComponent(data.category);
+            replay('revealed');
+          } catch (err) {
+            text.textContent = 'The dice rolled off the table. Try again.';
+          } finally {
+            panel.classList.remove('loading');
+          }
+        });
+      })();
+    </script>
+{% endblock %}

@@ -28,6 +28,22 @@ class Search(Resource):
         return jsonify(JsonReader.Search(query, limit))
 
 
+class RandomAny(Resource):
+    def get(self):
+        category = request.args.get('category', default=None, type=str)
+        return _lookup(JsonReader.RandomAny, category)
+
+
+class Combos(Resource):
+    def get(self):
+        return jsonify(JsonReader.GetCombos())
+
+
+class ComboRoll(Resource):
+    def get(self, combo_id):
+        return _lookup(JsonReader.RollCombo, combo_id)
+
+
 class RandomCategoryEntry(Resource):
     def get(self, category):
         arg = request.args.get('arg', default=None, type=str)

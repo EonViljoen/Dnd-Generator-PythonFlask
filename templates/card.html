@@ -1,34 +1,19 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D&D Prompt Helper</title>
-    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" sizes="48x48">
-    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles/style.css') }}">
-  </head>
-  <body>
-    <header class="app-header">
-      <div class="app-header-inner">
-        <a class="brand" href="/cards">
-          <i class="bi bi-dice-5" aria-hidden="true"></i>
-          <span>D&amp;D Prompt Helper</span>
-        </a>
+{% extends "base.html" %}
+
+{% block title %}Generator · D&D Prompt Helper{% endblock %}
+
+{% block header_extra %}
         <form class="search" role="search" id="search-form">
           <i class="bi bi-search" aria-hidden="true"></i>
           <input type="search" id="search-input" placeholder="Search prompts and tables…" aria-label="Search prompts and tables" autocomplete="off">
           <kbd class="search-hint" aria-hidden="true">/</kbd>
         </form>
-      </div>
-    </header>
+        <button type="button" class="btn-surprise" id="btn-surprise" title="Roll on a random table (S)">
+          <i class="bi bi-shuffle" aria-hidden="true"></i><span>Surprise me</span>
+        </button>
+{% endblock %}
 
+{% block content %}
     <div class="layout">
       <!-- Category navigation (sidebar on desktop, scrolling chips on mobile) -->
       <nav class="cat-nav" aria-label="Categories">
@@ -51,9 +36,9 @@
             </button>
           </div>
           <div class="result-scroll">
-            <p id="result-text" class="result-text is-empty">
+            <div id="result-text" class="result-text is-empty">
               Pick a table and roll for a random prompt.
-            </p>
+            </div>
           </div>
           <div class="result-actions">
             <button type="button" class="btn-ink" id="btn-reroll" disabled title="Roll again (R)">
@@ -110,7 +95,9 @@
 
     <div class="copy-toast" id="copy-toast" role="status" aria-live="polite"></div>
 
+{% endblock %}
+
+{% block scripts %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     <script src="{{ url_for('static', filename='scripts/app.js') }}"></script>
-  </body>
-</html>
+{% endblock %}
