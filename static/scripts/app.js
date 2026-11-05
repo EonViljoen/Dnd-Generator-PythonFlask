@@ -933,6 +933,13 @@ import {
                 toast('Couldn’t load your custom tables, showing the defaults');
             }
             setView(viewFromHash() || fallbackView());
+
+            // /cards?customize (linked from the homepage) opens the Customize panel
+            const params = new URLSearchParams(location.search);
+            if (params.has('customize')) {
+                window.history.replaceState(null, '', location.pathname + location.hash);
+                openCustomize();
+            }
         })
         .catch((err) => {
             els.content.replaceChildren(el('div', { class: 'empty-state', text: 'Could not load categories (' + err.message + '). Refresh to try again.' }));

@@ -17,7 +17,8 @@
           <h1 class="hero-title">Never get caught without an answer.</h1>
           <p class="hero-lead">
             The party wants to know what's in the goblin's pockets, who runs the tavern,
-            or what that strange door does. Roll a prompt in one click and keep the game moving.
+            or what that strange door does. Roll a prompt in one click and keep the game moving,
+            from the built-in tables or your own.
           </p>
           <div class="hero-ctas">
             <a class="btn-gold btn-lg-gold" href="{{ url_for('main.Cards') }}">
@@ -89,6 +90,45 @@
         </div>
       </section>
 
+      <!-- Customize -->
+      <section class="home-section">
+        <h2 class="home-heading">Make it your table</h2>
+        <p class="home-sub">Shape the generator around your campaign. Your changes only affect you.</p>
+        <div class="custom-grid">
+          <article class="custom-card">
+            <span class="combo-icon"><i class="bi bi-eye" aria-hidden="true"></i></span>
+            <h3>Show only what you use</h3>
+            <p>Hide any table or whole category you don't need. Hidden tables also drop out of search, Surprise me and Quick builds.</p>
+          </article>
+          <article class="custom-card">
+            <span class="combo-icon"><i class="bi bi-file-earmark-code" aria-hidden="true"></i></span>
+            <h3>Bring your own tables</h3>
+            <p>Load a JSON file with your homebrew tables. Add them alongside the built-in ones, or replace the defaults entirely.</p>
+            <pre class="custom-snippet" aria-label="Example file format"><code>{
+  "My Campaign": {
+    "Moon Omens": [
+      "Red moon: the dead stir.",
+      "Twin moons: twins are born."
+    ]
+  }
+}</code></pre>
+          </article>
+          <article class="custom-card">
+            <span class="combo-icon"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
+            <h3>Stays on your device</h3>
+            <p>Your file is checked and saved in this browser only. It's never uploaded, so nobody else sees it. Export a copy to use it on another device.</p>
+          </article>
+        </div>
+        <div class="hero-ctas custom-ctas">
+          <a class="btn-gold" href="{{ url_for('main.Cards') }}?customize">
+            <i class="bi bi-sliders" aria-hidden="true"></i> Customize your tables
+          </a>
+          <a class="btn-outline-gold" href="/api/getall" download="dnd-prompt-tables.json">
+            <i class="bi bi-download" aria-hidden="true"></i> Download the defaults as a template
+          </a>
+        </div>
+      </section>
+
       <!-- How it works -->
       <section class="home-section">
         <h2 class="home-heading">At the table</h2>
@@ -107,6 +147,11 @@
             <i class="bi bi-pin-angle" aria-hidden="true"></i>
             <h3>Keep the good ones</h3>
             <p>Pin prompts for tonight's session. Your last 10 rolls stay in this browser.</p>
+          </li>
+          <li>
+            <i class="bi bi-sliders" aria-hidden="true"></i>
+            <h3>Make it yours</h3>
+            <p>Use <strong>Customize</strong> to hide tables or load your own, saved privately in your browser.</p>
           </li>
         </ol>
       </section>
