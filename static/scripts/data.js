@@ -7,6 +7,8 @@
 // Custom JSON is stored only in this browser (IndexedDB). It is never sent
 // to the server.
 
+import { parse as parseDice } from './dice.js';
+
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 // Icons users can pick for their own categories (Bootstrap Icons names, all present in v1.11.3)
@@ -134,6 +136,44 @@ export const userBuilds = {
         try { await navigator.storage?.persist?.(); } catch { /* ignore */ }
     },
 };
+
+// ---------- Saved dice rolls ----------
+// Stored under one key as an ordered array: [{ id, name, notation, mode, createdAt, updatedAt }]
+// mode is 'normal' | 'adv' | 'dis'.
+const SAVED_ROLLS_KEY = 'savedRolls';
+export const MAX_ROLL_NAME = 40;
+export const MAX_SAVED_ROLLS = 50;
+const ROLL_MODES = new Set(['normal', 'adv', 'dis']);
+
+function cleanRoll(r) {
+    if (!isPlainObject(r) || !isText(r.id) || !isText(r.name) || !isText(r.notation)) return null;
+    try { parseDice(r.notation); } catch { return null; }
+    return {
+        id: r.id,
+        name: r.name.trim().slice(0, MAX_ROLL_NAME),
+        notation: r.notation.trim(),
+        mode: ROLL_MODES.has(r.mode) ? r.mode : 'normal',
+        createdAt: r.createdAt || null,
+        updatedAt: r.updatedAt || null,
+    };
+}
+
+export const savedRolls = {
+    async load() {
+        try {
+            const raw = await storage.get(SAVED_ROLLS_KEY);
+            return Array.isArray(raw) ? raw.map(cleanRoll).filter(Boolean).slice(0, MAX_SAVED_ROLLS) : [];
+        } catch {
+            return [];
+        }
+    },
+    async save(list) {
+        await storage.set(SAVED_ROLLS_KEY, list);
+        try { await navigator.storage?.persist?.(); } catch { /* ignore */ }
+    },
+};
+
+export const newRollId = () => 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 export const newBuildId = () => 'u-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 

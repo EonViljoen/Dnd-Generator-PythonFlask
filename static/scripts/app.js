@@ -2,6 +2,7 @@
 import {
     api, customData, createSource, parseCustomJson, ValidationError, downloadJson, MAX_FILE_BYTES,
     ICON_CHOICES, iconFor, userBuilds, newBuildId,
+    savedRolls, newRollId, MAX_ROLL_NAME, MAX_SAVED_ROLLS,
     DEFAULT_BUILD_ICON, MAX_BUILD_LINES, MIN_BUILD_LINES, MAX_TITLE_LENGTH,
 } from './data.js';
 import * as Dice from './dice.js';
@@ -89,6 +90,11 @@ import * as Dice from './dice.js';
         for (const c of children) if (c !== null && c !== undefined && c !== false) node.append(c);
         return node;
     }
+    // Like node.replaceChildren(), but skips null/undefined/false (as el() does) instead of
+    // inserting them as the text "null"
+    function fill(node, ...children) {
+        node.replaceChildren(...children.filter((c) => c !== null && c !== undefined && c !== false));
+    }
     const icon = (name, cls = '') => el('i', { class: ('bi bi-' + name + ' ' + cls).trim(), 'aria-hidden': 'true' });
     const keyOf = (category, sub) => category + '|' + sub;
     const crumbOf = (item) => item.category + ' › ' + item.sub;
@@ -164,7 +170,7 @@ import * as Dice from './dice.js';
                 extraClass: 'cat-btn-tool',
             }));
         }
-        els.nav.replaceChildren(...items);
+        fill(els.nav, ...items);
         const currentBtn = els.nav.querySelector('[aria-current="true"]');
         if (currentBtn) currentBtn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
@@ -228,7 +234,7 @@ import * as Dice from './dice.js';
     }
 
     function renderEmpty() {
-        els.content.replaceChildren(
+        fill(els.content, 
             el('div', { class: 'empty-state empty-state-lg' },
                 icon('eye-slash'),
                 el('p', { text: 'Every table is hidden.' }),
@@ -238,7 +244,7 @@ import * as Dice from './dice.js';
 
     function renderCategory(name) {
         const cat = structure.find((c) => c.name === name);
-        els.content.replaceChildren(
+        fill(els.content, 
             el('div', { class: 'content-head content-head-split' },
                 el('div', {},
                     el('div', { class: 'content-kicker', text: plural(cat.subcategories.length, 'table') + ' · ' + plural(cat.total, 'prompt') }),
@@ -286,7 +292,7 @@ import * as Dice from './dice.js';
     function renderCombos() {
         const builtIn = combos.filter((c) => !c.own);
         const own = combos.filter((c) => c.own);
-        els.content.replaceChildren(
+        fill(els.content, 
             el('div', { class: 'content-head content-head-split' },
                 el('div', {},
                     el('div', { class: 'content-kicker', text: plural(combos.filter(isRollable).length, 'generator') }),
@@ -425,7 +431,7 @@ import * as Dice from './dice.js';
             class: 'dice-mode-btn',
             'aria-pressed': 'false',
             'data-mode': value,
-            onclick: () => { diceSettings.mode = value; saveDiceSettings(); updateDiceControls(); },
+            onclick: () => setDiceMode(value),
         }, text));
 
         const dieButtons = Dice.STANDARD_DICE.map((sides) => {
@@ -451,12 +457,22 @@ import * as Dice from './dice.js';
             'aria-describedby': 'dice-error',
         });
         const error = el('p', { class: 'dice-error', id: 'dice-error', role: 'alert' });
+        const note = el('p', { class: 'dice-info', 'aria-live': 'polite' });
+        const modeHint = el('p', { class: 'dice-mode-hint', 'aria-live': 'polite' });
+        const savedCard = el('section', { class: 'dice-card saved-rolls', 'aria-labelledby': 'saved-rolls-title' });
         const form = el('form', {
             class: 'dice-form',
             onsubmit: (e) => { e.preventDefault(); if (rollDice(input.value)) input.select(); },
-        }, input, el('button', { type: 'submit', class: 'btn-gold' }, icon('dice-5'), el('span', { text: 'Roll' })));
+        }, input,
+            el('button', { type: 'submit', class: 'btn-gold' }, icon('dice-5'), el('span', { text: 'Roll' })),
+            el('button', {
+                type: 'button',
+                class: 'btn-outline-gold',
+                title: 'Save this roll with a name',
+                onclick: () => openRollEditor(null, { notation: input.value.trim(), mode: diceSettings.mode }),
+            }, icon('bookmark-plus'), el('span', { class: 'dice-save-label', text: 'Save' })));
 
-        els.content.replaceChildren(
+        fill(els.content, 
             el('div', { class: 'content-head' },
                 el('div', { class: 'content-kicker', text: 'Tools' }),
                 el('h1', { class: 'content-title', text: 'Dice' }),
@@ -469,13 +485,18 @@ import * as Dice from './dice.js';
                     mod.node,
                     el('div', { class: 'dice-mode' },
                         el('span', { class: 'dice-control-label', text: 'd20 rolls' }),
-                        el('div', { class: 'dice-mode-row', role: 'group', 'aria-label': 'd20 roll mode' }, ...modeButtons)))),
+                        el('div', { class: 'dice-mode-row', role: 'group', 'aria-label': 'd20 roll mode' }, ...modeButtons))),
+                modeHint),
+
+            savedCard,
 
             el('section', { class: 'dice-card' },
                 el('h2', { class: 'dice-card-title', text: 'Type any roll' }),
                 form,
                 error,
-                el('div', { class: 'dice-examples' }, ...DICE_EXAMPLES.map((ex) => el('button', {
+                note,
+                el('span', { class: 'dice-control-label dice-examples-label', id: 'dice-examples-label', text: 'Examples' }),
+                el('div', { class: 'dice-examples', role: 'group', 'aria-labelledby': 'dice-examples-label' }, ...DICE_EXAMPLES.map((ex) => el('button', {
                     type: 'button',
                     class: 'dice-example',
                     onclick: () => { input.value = ex.notation; rollDice(ex.notation); },
@@ -488,18 +509,39 @@ import * as Dice from './dice.js';
                         el('dt', {}, el('code', { text: 'd%' })), el('dd', { text: 'Percentile die, the same as 1d100.' }),
                         el('dt', {}, el('span', { text: 'Advantage' })), el('dd', { text: 'With Advantage or Disadvantage selected, every single d20 in a roll is rolled twice, keeping the higher or lower.' })))));
 
-        diceUi = { count, mod, modeButtons, dieButtons, input, error };
+        diceUi = { count, mod, modeButtons, dieButtons, input, error, note, modeHint, savedCard };
+        updateDiceControls();
+        renderSavedRolls();
+    }
+
+    // Advantage/disadvantage roll one d20 twice, so they only make sense with a single die
+    function setDiceMode(mode) {
+        diceSettings.mode = mode;
+        if (mode !== 'normal') diceSettings.count = 1;
+        saveDiceSettings();
         updateDiceControls();
     }
 
     function step(key, delta, min, max) {
         diceSettings[key] = Math.min(max, Math.max(min, diceSettings[key] + delta));
+        if (key === 'count' && diceSettings.count > 1 && diceSettings.mode !== 'normal') {
+            diceSettings.mode = 'normal'; // more than one die: back to a normal roll
+            if (diceUi) diceUi.modeHint.textContent = 'Switched to Normal: advantage and disadvantage use a single d20.';
+            saveDiceSettings();
+            updateDiceControls(false);
+            return;
+        }
         saveDiceSettings();
         updateDiceControls();
     }
 
-    function updateDiceControls() {
+    function updateDiceControls(resetHint = true) {
         if (!diceUi) return;
+        if (resetHint) {
+            diceUi.modeHint.textContent = diceSettings.mode === 'adv'
+                ? 'Rolls 2d20 and keeps the higher. Dice is set to 1.'
+                : diceSettings.mode === 'dis' ? 'Rolls 2d20 and keeps the lower. Dice is set to 1.' : '';
+        }
         for (const s of [diceUi.count, diceUi.mod]) {
             s.value.textContent = s.fmt(diceSettings[s.key]);
             s.dec.disabled = diceSettings[s.key] <= s.min;
@@ -514,8 +556,8 @@ import * as Dice from './dice.js';
         }
     }
 
-    // Roll notation in the current mode. Returns true on success.
-    function rollDice(notation, mode = diceSettings.mode) {
+    // Roll notation in the given mode (optionally under a saved roll's name). Returns true on success.
+    function rollDice(notation, mode = diceSettings.mode, name = null) {
         let parsed;
         try {
             parsed = Dice.parse(notation);
@@ -525,10 +567,15 @@ import * as Dice from './dice.js';
             else toast(err.message);
             return false;
         }
-        if (diceUi) diceUi.error.textContent = '';
         const { parsed: rolled, applied } = Dice.applyMode(parsed, mode);
+        if (diceUi) {
+            diceUi.error.textContent = '';
+            diceUi.note.textContent = mode !== 'normal' && !applied
+                ? MODE_LABELS[mode] + ' only applies to a single d20 (like 1d20+5), so this was rolled normally.'
+                : '';
+        }
         const base = Dice.format(parsed);
-        const label = base + (applied ? (mode === 'adv' ? ' (advantage)' : ' (disadvantage)') : '');
+        const label = (name ? name + ' · ' : '') + base + (applied ? (mode === 'adv' ? ' (advantage)' : ' (disadvantage)') : '');
         const result = Dice.roll(rolled);
         const item = {
             kind: 'dice',
@@ -536,6 +583,7 @@ import * as Dice from './dice.js';
             sub: label,
             notation: base,
             mode: applied ? mode : 'normal',
+            name: name || null,
             dice: result,
             text: Dice.describe(label, result),
         };
@@ -548,6 +596,167 @@ import * as Dice from './dice.js';
         showResult(item, { animate: true });
         addToHistory(item);
         return true;
+    }
+
+    // ---------- Saved rolls ----------
+    let rollList = [];   // [{ id, name, notation, mode }]
+    let rollDraft = null; // { id | null, name, notation, mode } while the editor is open
+
+    const MODE_SHORT = { adv: 'Adv', dis: 'Dis' };
+
+    function renderSavedRolls() {
+        if (!diceUi) return;
+        const card = diceUi.savedCard;
+        const full = rollList.length >= MAX_SAVED_ROLLS;
+        fill(card, 
+            el('div', { class: 'saved-rolls-head' },
+                el('h2', { class: 'dice-card-title', id: 'saved-rolls-title' },
+                    el('span', { text: 'Saved rolls' }),
+                    rollList.length ? el('span', { class: 'saved-rolls-count', text: rollList.length }) : null),
+                rollDraft ? null : el('button', {
+                    type: 'button',
+                    class: 'btn-outline-gold btn-sm-gold',
+                    disabled: full,
+                    title: full ? 'You can save up to ' + MAX_SAVED_ROLLS + ' rolls' : 'Save a roll you use often',
+                    onclick: () => openRollEditor(),
+                }, icon('plus-lg'), el('span', { text: 'New' }))),
+            rollDraft ? renderRollEditor() : null,
+            rollList.length
+                ? el('ul', { class: 'saved-roll-list' }, ...rollList.map(renderSavedRoll))
+                : (rollDraft ? null : el('p', { class: 'side-list-empty', text: 'Save the rolls you make all the time, like “Longsword attack: 1d20+5” or “Sneak attack: 3d6”, and roll them in one click.' })));
+    }
+
+    function renderSavedRoll(r) {
+        const editing = rollDraft?.id === r.id;
+        return el('li', { class: 'saved-roll' + (editing ? ' is-editing' : '') },
+            el('button', {
+                type: 'button',
+                class: 'saved-roll-main',
+                title: 'Roll ' + r.name + ' (' + r.notation + (r.mode !== 'normal' ? ', ' + MODE_LABELS[r.mode].toLowerCase() : '') + ')',
+                onclick: () => rollDice(r.notation, r.mode, r.name),
+            },
+                el('span', { class: 'saved-roll-icon' }, icon('dice-5')),
+                el('span', { class: 'saved-roll-text' },
+                    el('span', { class: 'saved-roll-name', text: r.name }),
+                    el('span', { class: 'saved-roll-meta' },
+                        el('code', { text: r.notation }),
+                        r.mode !== 'normal' ? el('span', { class: 'saved-roll-badge', text: MODE_SHORT[r.mode] }) : null))),
+            el('button', { type: 'button', class: 'icon-btn', title: 'Edit ' + r.name, 'aria-label': 'Edit ' + r.name, onclick: () => openRollEditor(r.id) }, icon('pencil')),
+            el('button', { type: 'button', class: 'icon-btn', title: 'Delete ' + r.name, 'aria-label': 'Delete ' + r.name, onclick: () => deleteRoll(r.id) }, icon('trash')));
+    }
+
+    function openRollEditor(id = null, prefill = {}) {
+        const existing = id ? rollList.find((r) => r.id === id) : null;
+        if (!existing && rollList.length >= MAX_SAVED_ROLLS) {
+            toast('You can save up to ' + MAX_SAVED_ROLLS + ' rolls');
+            return;
+        }
+        rollDraft = existing
+            ? { id: existing.id, name: existing.name, notation: existing.notation, mode: existing.mode }
+            : { id: null, name: '', notation: prefill.notation || '', mode: prefill.mode || 'normal' };
+        if (view?.type !== 'dice') goToDice();
+        renderSavedRolls();
+        const field = diceUi.savedCard.querySelector(rollDraft.name ? '#roll-notation' : '#roll-name');
+        field?.focus();
+        diceUi.savedCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    function closeRollEditor() {
+        rollDraft = null;
+        renderSavedRolls();
+    }
+
+    function renderRollEditor() {
+        const error = el('p', { class: 'dice-error', role: 'alert' });
+        const nameInput = el('input', {
+            type: 'text', id: 'roll-name', class: 'be-input', maxlength: MAX_ROLL_NAME, autocomplete: 'off',
+            placeholder: 'e.g. Longsword attack', oninput: (e) => { rollDraft.name = e.currentTarget.value; },
+        });
+        nameInput.value = rollDraft.name;
+        const notationInput = el('input', {
+            type: 'text', id: 'roll-notation', class: 'be-input dice-input', autocomplete: 'off', spellcheck: 'false',
+            placeholder: 'e.g. 1d20+5', oninput: (e) => { rollDraft.notation = e.currentTarget.value; },
+        });
+        notationInput.value = rollDraft.notation;
+        const modeSelect = el('select', {
+            id: 'roll-mode', class: 'be-input',
+            onchange: (e) => { rollDraft.mode = e.currentTarget.value; },
+        }, ...Object.entries(MODE_LABELS).map(([value, text]) => {
+            const opt = el('option', { value, text });
+            opt.selected = value === rollDraft.mode;
+            return opt;
+        }));
+
+        return el('form', {
+            class: 'saved-roll-editor',
+            novalidate: true,
+            onsubmit: (e) => { e.preventDefault(); saveRollDraft(error); },
+            onkeydown: (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeRollEditor(); } },
+        },
+            el('div', { class: 'saved-roll-fields' },
+                el('label', { class: 'be-field' }, el('span', { text: 'Name' }), nameInput),
+                el('label', { class: 'be-field' }, el('span', { text: 'Roll' }), notationInput),
+                el('label', { class: 'be-field' }, el('span', { text: 'd20 rolls' }), modeSelect)),
+            error,
+            el('div', { class: 'saved-roll-actions' },
+                el('button', { type: 'button', class: 'btn-outline-gold btn-sm-gold', onclick: closeRollEditor }, 'Cancel'),
+                el('button', { type: 'submit', class: 'btn-gold btn-sm-gold' }, icon('check-lg'), el('span', { text: rollDraft.id ? 'Save changes' : 'Save roll' }))));
+    }
+
+    async function saveRollDraft(errorEl) {
+        const name = rollDraft.name.trim();
+        const notation = rollDraft.notation.trim();
+        const fail = (msg, fieldId) => {
+            errorEl.textContent = msg;
+            diceUi.savedCard.querySelector('#' + fieldId)?.focus();
+        };
+        if (!name) return fail('Give the roll a name.', 'roll-name');
+        let parsed;
+        try {
+            parsed = Dice.parse(notation);
+        } catch (err) {
+            if (!(err instanceof Dice.DiceError)) throw err;
+            return fail(err.message, 'roll-notation');
+        }
+        if (rollDraft.mode !== 'normal' && !Dice.applyMode(parsed, rollDraft.mode).applied) {
+            return fail(MODE_LABELS[rollDraft.mode] + ' needs a single d20 in the roll, like 1d20+5.', 'roll-mode');
+        }
+        const now = new Date().toISOString();
+        const existing = rollDraft.id ? rollList.find((r) => r.id === rollDraft.id) : null;
+        const record = {
+            id: existing ? existing.id : newRollId(),
+            name: name.slice(0, MAX_ROLL_NAME),
+            notation: Dice.format(parsed),
+            mode: rollDraft.mode,
+            createdAt: existing?.createdAt || now,
+            updatedAt: now,
+        };
+        const next = existing ? rollList.map((r) => (r.id === record.id ? record : r)) : [...rollList, record];
+        try {
+            await savedRolls.save(next);
+        } catch (err) {
+            return fail('Could not save in this browser: ' + (err.message || err), 'roll-name');
+        }
+        rollList = next;
+        rollDraft = null;
+        renderSavedRolls();
+        toast((existing ? 'Saved changes to “' : 'Saved “') + record.name + '”');
+    }
+
+    async function deleteRoll(id) {
+        const r = rollList.find((x) => x.id === id);
+        if (!r || !window.confirm('Delete the saved roll “' + r.name + '”?')) return;
+        const next = rollList.filter((x) => x.id !== id);
+        try {
+            await savedRolls.save(next);
+        } catch (err) {
+            toast('Could not delete (' + (err.message || err) + ')');
+            return;
+        }
+        rollList = next;
+        if (rollDraft?.id === id) rollDraft = null;
+        renderSavedRolls();
+        toast('Deleted “' + r.name + '”');
     }
 
     function renderDiceResult(r) {
@@ -584,7 +793,7 @@ import * as Dice from './dice.js';
         }
 
         const promptSection = el('div', {}, el('p', { class: 'loading', text: 'Searching prompts…' }));
-        els.content.replaceChildren(
+        fill(els.content, 
             el('div', { class: 'content-head' },
                 el('div', { class: 'content-kicker', text: 'Search' }),
                 el('h1', { class: 'content-title', text: '“' + needle + '”' })),
@@ -596,7 +805,7 @@ import * as Dice from './dice.js';
             promptSection);
 
         if (needle.length < MIN_TEXT_SEARCH) {
-            promptSection.replaceChildren(el('p', { class: 'side-list-empty', text: 'Type at least ' + MIN_TEXT_SEARCH + ' letters to search inside prompts.' }));
+            fill(promptSection, el('p', { class: 'side-list-empty', text: 'Type at least ' + MIN_TEXT_SEARCH + ' letters to search inside prompts.' }));
             return;
         }
 
@@ -614,10 +823,10 @@ import * as Dice from './dice.js';
                 }
                 promptSection.previousSibling.textContent = 'Prompts (' + total.toLocaleString() + ')';
                 if (!results.length) {
-                    promptSection.replaceChildren(el('p', { class: 'empty-state', text: 'No prompts contain “' + needle + '”.' }));
+                    fill(promptSection, el('p', { class: 'empty-state', text: 'No prompts contain “' + needle + '”.' }));
                     return;
                 }
-                promptSection.replaceChildren(
+                fill(promptSection, 
                     el('ul', { class: 'prompt-hits' }, ...results.map((r) => {
                         const item = { category: r.category, sub: r.sub, text: r.text };
                         return el('li', {}, el('button', {
@@ -632,7 +841,7 @@ import * as Dice from './dice.js';
             })
             .catch((err) => {
                 if (seq !== searchSeq) return;
-                promptSection.replaceChildren(el('p', { class: 'empty-state', text: 'Search failed (' + err.message + ').' }));
+                fill(promptSection, el('p', { class: 'empty-state', text: 'Search failed (' + err.message + ').' }));
             });
     }
 
@@ -711,9 +920,9 @@ import * as Dice from './dice.js';
         els.crumb.textContent = crumbOf(item);
         els.text.className = 'result-text';
         if (item.dice) {
-            els.text.replaceChildren(renderDiceResult(item.dice));
+            fill(els.text, renderDiceResult(item.dice));
         } else if (item.parts) {
-            els.text.replaceChildren(el('dl', { class: 'result-parts' }, ...item.parts.map((p, i) =>
+            fill(els.text, el('dl', { class: 'result-parts' }, ...item.parts.map((p, i) =>
                 el('div', { class: 'result-part' + (i === animatePart ? ' revealed' : '') },
                     el('dt', {},
                         el('span', { text: p.label }),
@@ -736,7 +945,7 @@ import * as Dice from './dice.js';
     // ---------- Result actions ----------
     const rollAgain = () => {
         if (!current) return;
-        if (current.kind === 'dice') rollDice(current.notation, current.mode);
+        if (current.kind === 'dice') rollDice(current.notation, current.mode, current.name);
         else if (current.comboId) rollCombo(current.comboId);
         else roll(current.category, current.sub);
     };
@@ -835,13 +1044,13 @@ import * as Dice from './dice.js';
     }
 
     function renderPins() {
-        els.pinnedList.replaceChildren(...pins.map((p) =>
+        fill(els.pinnedList, ...pins.map((p) =>
             renderSideItem(p, { icon: 'x-lg', label: 'Unpin', run: () => togglePin(p) })));
         els.pinnedEmpty.hidden = pins.length > 0;
     }
 
     function renderHistory() {
-        els.historyList.replaceChildren(...history.map((h) => {
+        fill(els.historyList, ...history.map((h) => {
             const pinned = isPinned(h);
             return renderSideItem(h, {
                 icon: pinned ? 'pin-angle-fill' : 'pin-angle',
@@ -871,7 +1080,7 @@ import * as Dice from './dice.js';
         els.modalTitle.textContent = sub;
         els.modalFilter.value = '';
         els.modalCount.textContent = '';
-        els.modalList.replaceChildren(el('li', { class: 'text-body-secondary', text: 'Loading…' }));
+        fill(els.modalList, el('li', { class: 'text-body-secondary', text: 'Loading…' }));
         modal.show();
         try {
             const entries = await source.entries(category, sub);
@@ -879,7 +1088,7 @@ import * as Dice from './dice.js';
             modalTable.entries = entries;
             renderEntries();
         } catch (err) {
-            els.modalList.replaceChildren(el('li', { class: 'text-danger', text: 'Could not load entries (' + err.message + ').' }));
+            fill(els.modalList, el('li', { class: 'text-danger', text: 'Could not load entries (' + err.message + ').' }));
         }
     }
 
@@ -913,11 +1122,11 @@ import * as Dice from './dice.js';
                                 const btn = e.currentTarget;
                                 btn.classList.toggle('is-on', on);
                                 btn.title = on ? 'Unpin' : 'Pin';
-                                btn.replaceChildren(icon(on ? 'pin-angle-fill' : 'pin-angle'));
+                                fill(btn, icon(on ? 'pin-angle-fill' : 'pin-angle'));
                             },
                         }, icon(pinned ? 'pin-angle-fill' : 'pin-angle'))))));
         });
-        els.modalList.replaceChildren(...(rows.length ? rows : [el('li', { class: 'text-body-secondary', text: 'No entries match.' })]));
+        fill(els.modalList, ...(rows.length ? rows : [el('li', { class: 'text-body-secondary', text: 'No entries match.' })]));
         els.modalCount.textContent = needle ? rows.length + ' of ' + entries.length : countLabel(entries.length);
     }
 
@@ -979,8 +1188,8 @@ import * as Dice from './dice.js';
         }
         if (nHidden) parts.push(el('span', {}, icon('eye-slash'), ' ' + plural(nHidden, 'table') + ' hidden'));
         els.banner.hidden = !parts.length;
-        if (!parts.length) { els.banner.replaceChildren(); return; }
-        els.banner.replaceChildren(
+        if (!parts.length) { fill(els.banner); return; }
+        fill(els.banner, 
             el('div', { class: 'data-banner-text' }, ...parts),
             el('button', { type: 'button', class: 'link-btn', onclick: openCustomize, text: 'Customize' }));
     }
@@ -1015,14 +1224,14 @@ import * as Dice from './dice.js';
         // Status
         if (custom) {
             const when = custom.uploadedAt ? new Date(custom.uploadedAt).toLocaleDateString() : '';
-            cz.status.replaceChildren(
+            fill(cz.status, 
                 el('div', { class: 'cz-status-card is-custom' },
                     icon('check-circle-fill'),
                     el('div', {},
                         el('strong', { text: custom.name || 'Your file' }),
                         el('small', { text: plural(custom.tables, 'table') + ' · ' + plural(custom.prompts, 'prompt') + (when ? ' · loaded ' + when : '') }))));
         } else {
-            cz.status.replaceChildren(
+            fill(cz.status, 
                 el('div', { class: 'cz-status-card' },
                     icon('info-circle'),
                     el('div', {},
@@ -1054,8 +1263,8 @@ import * as Dice from './dice.js';
 
     function renderIcons() {
         cz.iconsSection.hidden = !custom;
-        if (!custom) { cz.icons.replaceChildren(); return; }
-        cz.icons.replaceChildren(...Object.keys(custom.data).map((cat) => {
+        if (!custom) { fill(cz.icons); return; }
+        fill(cz.icons, ...Object.keys(custom.data).map((cat) => {
             const currentIcon = iconFor(cat, custom, serverStructure);
             const picked = !!custom.icons?.[cat];
             const isOpen = openPicker === cat;
@@ -1110,7 +1319,7 @@ import * as Dice from './dice.js';
     }
 
     function showMessages(kind, title, lines = []) {
-        cz.messages.replaceChildren(
+        fill(cz.messages, 
             el('div', { class: 'cz-msg cz-msg-' + kind },
                 el('strong', { text: title }),
                 lines.length ? el('ul', {}, ...lines.map((l) => el('li', { text: l }))) : null));
@@ -1132,7 +1341,7 @@ import * as Dice from './dice.js';
     }
 
     async function handleFile(file) {
-        cz.messages.replaceChildren();
+        fill(cz.messages);
         if (!file) return;
         if (file.size > MAX_FILE_BYTES) {
             showMessages('error', 'That file is too large.', ['The limit is ' + (MAX_FILE_BYTES / 1024 / 1024) + ' MB.']);
@@ -1181,7 +1390,7 @@ import * as Dice from './dice.js';
     cz.resetBtn.addEventListener('click', async () => {
         if (!custom) return;
         if (!window.confirm('Remove “' + (custom.name || 'your file') + '” from this browser? Export it first if you want to keep a copy.')) return;
-        cz.messages.replaceChildren();
+        fill(cz.messages);
         await applyCustom(null, 'Back to the built-in tables.');
     });
 
@@ -1226,7 +1435,7 @@ import * as Dice from './dice.js';
                         el('span', { class: 'cz-table-count', text: s.count }));
                 }))));
         }
-        cz.visList.replaceChildren(...(groups.length ? groups : [el('p', { class: 'side-list-empty', text: 'No tables match.' })]));
+        fill(cz.visList, ...(groups.length ? groups : [el('p', { class: 'side-list-empty', text: 'No tables match.' })]));
     }
 
     cz.visFilter.addEventListener('input', renderVisibility);
@@ -1266,7 +1475,7 @@ import * as Dice from './dice.js';
         be.heading.textContent = existing ? 'Edit build' : 'New build';
         be.title.value = draft.title;
         be.del.hidden = !existing;
-        be.messages.replaceChildren();
+        fill(be.messages);
         setPickerOpen(false);
         renderDraftIcon();
         renderLines();
@@ -1286,11 +1495,11 @@ import * as Dice from './dice.js';
     function setPickerOpen(open) {
         be.picker.hidden = !open;
         be.iconBtn.setAttribute('aria-expanded', String(open));
-        if (open) be.picker.replaceChildren(iconGrid(draft.icon, pickDraftIcon));
+        if (open) fill(be.picker, iconGrid(draft.icon, pickDraftIcon));
     }
     function renderDraftIcon() {
-        be.swatch.replaceChildren(icon(draft.icon));
-        if (!be.picker.hidden) be.picker.replaceChildren(iconGrid(draft.icon, pickDraftIcon));
+        fill(be.swatch, icon(draft.icon));
+        if (!be.picker.hidden) fill(be.picker, iconGrid(draft.icon, pickDraftIcon));
     }
     function pickDraftIcon(name) {
         draft.icon = name;
@@ -1316,7 +1525,7 @@ import * as Dice from './dice.js';
     }
 
     function renderLines() {
-        be.lines.replaceChildren(...draft.parts.map((p, i) => renderLine(p, i)));
+        fill(be.lines, ...draft.parts.map((p, i) => renderLine(p, i)));
         be.add.disabled = draft.parts.length >= MAX_BUILD_LINES;
         be.add.title = be.add.disabled ? 'Up to ' + MAX_BUILD_LINES + ' lines' : '';
     }
@@ -1414,7 +1623,7 @@ import * as Dice from './dice.js';
     });
 
     function showBuildMessages(kind, title, lines = []) {
-        be.messages.replaceChildren(
+        fill(be.messages, 
             el('div', { class: 'cz-msg cz-msg-' + kind },
                 el('strong', { text: title }),
                 lines.length ? el('ul', {}, ...lines.map((l) => el('li', { text: l }))) : null));
@@ -1480,6 +1689,7 @@ import * as Dice from './dice.js';
             serverStructure = data;
             serverRecipes = comboList;
             builds = await userBuilds.load();
+            rollList = await savedRolls.load();
             try {
                 await loadSource();
             } catch (err) {
@@ -1501,7 +1711,7 @@ import * as Dice from './dice.js';
             }
         })
         .catch((err) => {
-            els.content.replaceChildren(el('div', { class: 'empty-state', text: 'Could not load categories (' + err.message + '). Refresh to try again.' }));
+            fill(els.content, el('div', { class: 'empty-state', text: 'Could not load categories (' + err.message + '). Refresh to try again.' }));
         });
 
     window.addEventListener('hashchange', () => {
