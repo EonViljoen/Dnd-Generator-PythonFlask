@@ -60,6 +60,27 @@ class JsonReader():
         ]
 
     @staticmethod
+    def Search(query, limit=50):
+        """Case-insensitive substring search over every entry.
+
+        Returns {'total': n, 'results': [{category, sub, index, text}, ...]}
+        with at most `limit` results.
+        """
+        needle = query.strip().lower()
+        results = []
+        total = 0
+        if not needle:
+            return {'total': 0, 'results': results}
+        for section, subsections in JsonReader.data.items():
+            for sub, entries in subsections.items():
+                for index, text in enumerate(entries):
+                    if needle in text.lower():
+                        total += 1
+                        if len(results) < limit:
+                            results.append({'category': section, 'sub': sub, 'index': index, 'text': text})
+        return {'total': total, 'results': results}
+
+    @staticmethod
     def EntryCount(section=None, innerSection=None):
         # Kept for backwards compatibility: returns a one-item list.
         if section is None or innerSection is None:

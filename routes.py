@@ -21,6 +21,13 @@ class Structure(Resource):
         return jsonify(JsonReader.GetStructure())
 
 
+class Search(Resource):
+    def get(self):
+        query = request.args.get('q', default='', type=str)
+        limit = min(request.args.get('limit', default=50, type=int), 200)
+        return jsonify(JsonReader.Search(query, limit))
+
+
 class RandomCategoryEntry(Resource):
     def get(self, category):
         arg = request.args.get('arg', default=None, type=str)
