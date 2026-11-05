@@ -1723,8 +1723,120 @@ import * as Init from './initiative.js';
         const mode = custom ? custom.mode : pendingMode;
         for (const radio of cz.modes()) radio.checked = radio.value === mode;
         cz.exportBtn.hidden = cz.resetBtn.hidden = !custom;
+        renderTheme();
         renderIcons();
         renderVisibility();
+    }
+
+    // ---------- Theme picker (presets + custom colours; see theme.js) ----------
+    const T = window.DndTheme;
+    const themeUi = { presets: $('cz-theme-presets'), custom: $('cz-theme-custom') };
+    let themeState = T.load();
+
+    function setTheme(next) {
+        themeState = next;
+        T.save(themeState);
+        T.apply(themeState);
+    }
+
+    function themeSwatch(colors) {
+        return el('span', { class: 'theme-swatch', style: 'background:' + colors.bg, 'aria-hidden': 'true' },
+            el('span', { class: 'theme-swatch-card', style: 'background:' + colors.surface + ';border-color:' + colors.accent },
+                el('span', { class: 'theme-swatch-line', style: 'background:' + colors.text }),
+                el('span', { class: 'theme-swatch-line is-short', style: 'background:' + colors.accent })),
+            el('span', { class: 'theme-swatch-paper', style: 'background:' + colors.paper },
+                el('span', { class: 'theme-swatch-line', style: 'background:' + colors.ink }),
+                el('span', { class: 'theme-swatch-dot', style: 'background:' + colors.danger })));
+    }
+
+    function renderTheme() {
+        const active = themeState.preset;
+        const presetCards = Object.entries(T.PRESETS).map(([key, p]) => el('button', {
+            type: 'button',
+            class: 'theme-card',
+            'aria-pressed': String(active === key),
+            onclick: () => { setTheme({ ...themeState, preset: key }); renderTheme(); },
+        }, themeSwatch(p.colors), el('span', { class: 'theme-name', text: p.name }), el('span', { class: 'theme-blurb', text: p.blurb })));
+
+        const customColors = T.resolve({ ...themeState, preset: 'custom' });
+        const customCard = el('button', {
+            type: 'button',
+            class: 'theme-card',
+            'aria-pressed': String(active === 'custom'),
+            onclick: () => {
+                // First time: start from the theme you're on now
+                const startFrom = T.PRESETS[active] ? active : 'tavern';
+                const customState = themeState.custom?.colors ? themeState.custom : { base: startFrom, colors: { ...T.PRESETS[startFrom].colors } };
+                setTheme({ preset: 'custom', custom: customState });
+                renderTheme();
+            },
+        }, themeSwatch(customColors), el('span', { class: 'theme-name' }, icon('sliders'), ' Custom'), el('span', { class: 'theme-blurb', text: 'Your own colours' }));
+
+        fill(themeUi.presets, ...presetCards, customCard);
+        themeUi.custom.hidden = active !== 'custom';
+        if (active === 'custom') renderThemeEditor();
+    }
+
+    function contrast(a, b) {
+        const [l1, l2] = [T.luminance(a), T.luminance(b)].sort((x, y) => y - x);
+        return (l1 + 0.05) / (l2 + 0.05);
+    }
+
+    function renderThemeEditor() {
+        const colors = T.resolve(themeState);
+        const warning = el('p', { class: 'dice-info theme-warning', 'aria-live': 'polite' });
+        const checkContrast = () => {
+            const c = T.resolve(themeState);
+            const issues = [];
+            if (contrast(c.text, c.bg) < 4.5 || contrast(c.text, c.surface) < 4.5) issues.push('Text may be hard to read on the background or cards.');
+            if (contrast(c.ink, c.paper) < 4.5) issues.push('Paper text may be hard to read on the result paper.');
+            warning.textContent = issues.join(' ');
+        };
+        let saveTimer;
+        const rows = T.FIELDS.map((f) => {
+            const hex = el('code', { class: 'theme-hex', text: colors[f.key] });
+            const input = el('input', {
+                type: 'color',
+                value: colors[f.key],
+                'aria-label': f.label + ' colour',
+                oninput: (e) => {
+                    const value = e.currentTarget.value;
+                    hex.textContent = value;
+                    themeState = { preset: 'custom', custom: { ...themeState.custom, colors: { ...T.resolve(themeState), [f.key]: value } } };
+                    T.apply(themeState); // live preview
+                    clearTimeout(saveTimer);
+                    saveTimer = setTimeout(() => { T.save(themeState); renderThemeCardsOnly(); }, 250);
+                    checkContrast();
+                },
+            });
+            return el('label', { class: 'theme-field' }, input, el('span', { class: 'theme-field-text' }, el('span', { text: f.label }), hex));
+        });
+        const baseSelect = el('select', {
+            class: 'be-input theme-base',
+            'aria-label': 'Start from a preset',
+            onchange: (e) => {
+                const base = e.currentTarget.value;
+                setTheme({ preset: 'custom', custom: { base, colors: { ...T.PRESETS[base].colors } } });
+                renderTheme();
+            },
+        }, ...Object.entries(T.PRESETS).map(([key, p]) => {
+            const o = el('option', { value: key, text: p.name });
+            o.selected = key === (themeState.custom?.base || 'tavern');
+            return o;
+        }));
+        fill(themeUi.custom,
+            el('div', { class: 'theme-fields' }, ...rows),
+            el('div', { class: 'theme-custom-foot' },
+                el('label', { class: 'theme-reset' }, el('span', { text: 'Reset to' }), baseSelect),
+                warning));
+        checkContrast();
+    }
+
+    // Refresh just the preset/custom cards (keeps the colour inputs, so a picker stays open)
+    function renderThemeCardsOnly() {
+        const customCard = themeUi.presets.lastElementChild;
+        const swatch = customCard?.querySelector('.theme-swatch');
+        if (swatch) swatch.replaceWith(themeSwatch(T.resolve(themeState)));
     }
 
     // ---------- Category icon picker ----------

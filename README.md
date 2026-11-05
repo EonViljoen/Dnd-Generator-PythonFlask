@@ -53,6 +53,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 📌 **Pins and history** | Keep the prompts you'll use tonight. Your last 10 rolls are always one click away. |
 | 🎛️ **Customize** | Hide tables you don't use, or load your own JSON, added to the defaults or replacing them, with a custom icon per category. |
 | 🔗 **Share by link** | Share a result, a custom Quick build or a saved roll with a link. The data lives in the link itself (after the `#`, which never reaches the server); opening it shows the result or offers to add the build/roll. Shared dice show the exact same roll. |
+| 🎨 **Themes** | Five presets (Tavern, Arcane, Forest, Frost and the light Parchment), or build your own from 7 colours with a live preview and a readability check. Saved in your browser and applied before the page draws. |
 | 🔒 **Private by design** | Custom tables, builds, pins and history stay in your browser. Nothing is uploaded and there are no accounts. |
 | 📱 **Works anywhere** | Responsive layout: sidebar on desktop, scrolling category chips and a bottom result sheet on phones. |
 
@@ -125,12 +126,12 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 |------|----------|
 | Vanilla JavaScript (ES modules) | All UI logic, with no framework or build step (`app.js`, `data.js`) |
 | [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API) | Stores custom JSON tables, custom Quick builds and saved dice rolls in the browser |
-| [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history, hidden tables, dice settings and the initiative tracker |
+| [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history, hidden tables, dice settings, the initiative tracker and your theme |
 | [Web Crypto](https://developer.mozilla.org/docs/Web/API/Crypto/getRandomValues) | Unbiased dice rolls (`crypto.getRandomValues` with rejection sampling) |
 | [Bootstrap 5.3](https://getbootstrap.com/) | Modals and base styles (dark theme) |
 | [Bootstrap Icons 1.11](https://icons.getbootstrap.com/) | Every icon in the app, including the category and build icon picker |
 | [Google Fonts](https://fonts.google.com/) | *Cinzel* for headings, *EB Garamond* for prompt text |
-| Custom CSS | The "tavern at night" theme, built on CSS custom properties |
+| Custom CSS | Themes built on CSS custom properties: 7 base colours per theme, every other shade derived with `color-mix()` |
 
 ### Hosting and tooling
 
@@ -209,6 +210,7 @@ node --test tests/*.test.mjs
 │   └── card.html         # Generator page and its modals
 ├── static/
 │   ├── scripts/
+│   │   ├── theme.js      # Theme presets/custom colours, applied in <head> before first paint
 │   │   ├── app.js        # Generator UI (ES module)
 │   │   ├── data.js       # Data layer: server/local sources, IndexedDB, validation
 │   │   ├── dice.js       # Dice notation parser and fair roller (no DOM, testable in Node)

@@ -109,11 +109,19 @@
           <div class="modal-header">
             <div class="flex-grow-1">
               <div class="modal-kicker">Customize</div>
-              <h5 class="modal-title" id="customizeModalLabel">Your tables</h5>
+              <h5 class="modal-title" id="customizeModalLabel">Make it yours</h5>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body cz">
+            <!-- Theme -->
+            <section class="cz-section" id="cz-theme-section">
+              <h6 class="cz-heading"><i class="bi bi-palette"></i> Theme</h6>
+              <p class="cz-sub">Applies to every page and is saved in this browser.</p>
+              <div id="cz-theme-presets" class="theme-grid" role="group" aria-label="Theme"></div>
+              <div id="cz-theme-custom" class="theme-custom" hidden></div>
+            </section>
+
             <!-- Data source -->
             <section class="cz-section">
               <h6 class="cz-heading"><i class="bi bi-file-earmark-code"></i> Your own JSON</h6>

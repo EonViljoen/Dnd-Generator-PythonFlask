@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}D&D Prompt Helper{% endblock %}</title>
     <meta name="description" content="Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and more. Roll one when the party goes off-script.">
+    <meta name="theme-color" content="#15110e">
+    <!-- Applies the saved theme before first paint (no flash) -->
+    <script src="{{ url_for('static', filename='scripts/theme.js') }}"></script>
     <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}" sizes="48x48">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/favicon.svg') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/apple-touch-icon.png') }}">
