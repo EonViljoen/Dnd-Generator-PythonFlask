@@ -147,3 +147,21 @@ export function describe(label, result) {
     });
     return label + ' = ' + result.total + ' · ' + parts.join(' ');
 }
+
+// ---------- Dice written in prose ----------
+// Finds rolls inside prompt text: "1d4 hours", "a D20", "2d6 + 3 damage", "2d4x100gp", "d3 x 1000gp".
+// A modifier followed by ":" is treated as a list ("Roll a d3- 1: Melee 2: ...") and ignored.
+const INLINE = /(?<![\w.])(\d{0,3})d(\d{1,4})(?:\s?([+\-−])\s?(\d{1,4})(?!\d)(?!\s*:))?(?:\s*[x×]\s*(\d{1,5})(?!\d))?(?!\d)/gi;
+
+// -> [{ index, length, text, notation, multiplier }]
+export function findInlineDice(text) {
+    const found = [];
+    for (const m of String(text).matchAll(INLINE)) {
+        const count = m[1] ? Number(m[1]) : 1;
+        let notation = count + 'd' + Number(m[2]);
+        if (m[3]) notation += (m[3] === '+' ? '+' : '-') + Number(m[4]);
+        try { parse(notation); } catch { continue; }
+        found.push({ index: m.index, length: m[0].length, text: m[0], notation, multiplier: m[5] ? Number(m[5]) : 1 });
+    }
+    return found;
+}

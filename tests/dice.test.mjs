@@ -57,3 +57,28 @@ t('rollDie is in range and roughly uniform', () => {
   for (let f = 1; f <= 20; f++) assert.ok(Math.abs(counts[f] / N - 0.05) < 0.003, 'face ' + f + ': ' + counts[f]);
   for (const s of [2, 3, 4, 6, 8, 10, 12, 100, 1000]) for (let k = 0; k < 2000; k++) { const v = rollDie(s); assert.ok(v >= 1 && v <= s); }
 });
+
+import { findInlineDice } from '../static/scripts/dice.js';
+const found = (s) => findInlineDice(s).map((d) => [d.text, d.notation, d.multiplier]);
+
+test('finds dice written in prompts', () => {
+  assert.deepEqual(found('The trap resets in 1d4 days.'), [['1d4', '1d4', 1]]);
+  assert.deepEqual(found('roll a d6 to see what happens'), [['d6', '1d6', 1]]);
+  assert.deepEqual(found('Roll a D20; if the roll is a 20, roll a D100'), [['D20', '1d20', 1], ['D100', '1d100', 1]]);
+  assert.deepEqual(found('deals 2d6 + 3 fire damage'), [['2d6 + 3', '2d6+3', 1]]);
+  assert.deepEqual(found('a series of (d4 + 2) disks'), [['d4 + 2', '1d4+2', 1]]);
+  assert.deepEqual(found('heals 1d8−1'), [['1d8−1', '1d8-1', 1]]);
+  assert.deepEqual(found('worth 2d4x100gp.'), [['2d4x100', '2d4', 100]]);
+  assert.deepEqual(found('(d3 x 100gp each)'), [['d3 x 100', '1d3', 100]]);
+  assert.deepEqual(found('2d10/4d10 damage'), [['2d10', '2d10', 1], ['4d10', '4d10', 1]]);
+  assert.deepEqual(found('a 1d10-foot drop'), [['1d10', '1d10', 1]]);
+  assert.deepEqual(found('D20+DEX: 1-10 miss'), [['D20', '1d20', 1]]);
+  assert.deepEqual(found('25+2D10 gold'), [['2D10', '2d10', 1]]);
+});
+
+test('ignores lists, words and impossible dice', () => {
+  assert.deepEqual(found('Roll a d3- 1: Melee 2: Magic'), [['d3', '1d3', 1]]);
+  for (const s of ['dmg1d2;', 'Room D1 is empty', '0d6', 'add 1000d6', 'hand d', 'v1.d6'])
+    assert.deepEqual(found(s), [], s);
+  assert.deepEqual(found('rolls two d6s'), [['d6', '1d6', 1]]); // plural dice still count
+});

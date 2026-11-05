@@ -45,7 +45,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 🎲 **One-click rolls** | Pick a table and roll. The result appears on a parchment panel with **Roll again**, **Copy** and **Pin**. |
 | ⚡ **Quick builds** | Roll several tables at once: a Quick NPC, Tavern, Town, Villain or Side Quest. Reroll any single line you don't like. |
 | 🛠️ **Your own builds** | Create Quick builds from any tables: name each line, pick an icon, reorder lines, or copy a built-in build as a starting point. |
-| 🎯 **Dice roller** | d4 to d100 with a count, modifier and advantage/disadvantage, or type any notation (`2d6+3`, `4d6kh3`, `1d20+1d4`). Save named rolls like *Longsword attack* to reuse in one click. Shows every die, highlights natural 20s and 1s, and uses fair cryptographic randomness. |
+| 🎯 **Dice roller** | d4 to d100 with a count, modifier and advantage/disadvantage, or type any notation (`2d6+3`, `4d6kh3`, `1d20+1d4`). Save named rolls like *Longsword attack* to reuse in one click. Dice written inside prompts ("lasts *1d4* hours", "*2d4×100* gp") are clickable too. Shows every die, highlights natural 20s and 1s, and uses fair cryptographic randomness. |
 | 🔀 **Surprise me** | Roll on a random table, or on any table within the current category. |
 | 🔍 **Search** | Search every table name and all 10k+ prompts, with highlighted matches. |
 | 📜 **Browse tables** | View any table as a numbered, filterable list, and copy or pin individual entries. |

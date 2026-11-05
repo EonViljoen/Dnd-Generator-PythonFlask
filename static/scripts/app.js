@@ -759,6 +759,46 @@ import * as Dice from './dice.js';
         toast('Deleted “' + r.name + '”');
     }
 
+    // ---------- Dice inside prompt text ----------
+    // "Lasts 1d4 hours" -> "Lasts [🎲 1d4] hours"; clicking rolls it in place (not added to history).
+    function withInlineDice(text) {
+        const frag = document.createDocumentFragment();
+        let i = 0;
+        for (const d of Dice.findInlineDice(text)) {
+            frag.append(text.slice(i, d.index), inlineDieButton(d));
+            i = d.index + d.length;
+        }
+        frag.append(text.slice(i));
+        return frag;
+    }
+
+    function inlineDieButton(d) {
+        const what = d.notation + (d.multiplier > 1 ? ' × ' + d.multiplier.toLocaleString() : '');
+        const total = el('span', { class: 'inline-die-total', 'aria-live': 'polite' });
+        const btn = el('button', {
+            type: 'button',
+            class: 'inline-die',
+            title: 'Roll ' + what,
+            'aria-label': 'Roll ' + what,
+        }, icon('dice-5'), el('span', { text: d.text }), total);
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const r = Dice.roll(Dice.parse(d.notation));
+            const value = r.total * d.multiplier;
+            total.textContent = '= ' + value.toLocaleString();
+            btn.classList.add('is-rolled');
+            btn.classList.toggle('is-crit', r.nat20);
+            btn.classList.toggle('is-fumble', r.nat1);
+            const detail = Dice.describe(d.notation, r) + (d.multiplier > 1 ? ' × ' + d.multiplier.toLocaleString() + ' = ' + value.toLocaleString() : '');
+            btn.title = detail + ' (click to roll again)';
+            btn.setAttribute('aria-label', 'Rolled ' + what + ': ' + value.toLocaleString() + '. Roll again');
+            total.classList.remove('pop');
+            void total.offsetWidth;
+            total.classList.add('pop');
+        });
+        return btn;
+    }
+
     function renderDiceResult(r) {
         const op = (t, i) => (i === 0 ? (t.sign < 0 ? '−' : '') : (t.sign < 0 ? '−' : '+'));
         return el('div', { class: 'dice-result' + (r.nat20 ? ' is-crit' : '') + (r.nat1 ? ' is-fumble' : '') },
@@ -933,9 +973,9 @@ import * as Dice from './dice.js';
                             'aria-label': 'Reroll ' + p.label.toLowerCase(),
                             onclick: () => rerollPart(i),
                         }, icon('arrow-repeat'))),
-                    el('dd', { text: p.text })))));
+                    el('dd', {}, withInlineDice(p.text))))));
         } else {
-            els.text.textContent = item.text;
+            fill(els.text, withInlineDice(item.text));
         }
         if (animate) restartAnimation('revealed');
         els.reroll.disabled = els.copy.disabled = els.pin.disabled = false;
