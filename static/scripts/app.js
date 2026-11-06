@@ -10,6 +10,7 @@ import {
 import * as Dice from './dice.js';
 import * as Init from './initiative.js';
 import * as Edits from './edits.js';
+import * as Backup from './backup.js';
 
 {
     const HISTORY_KEY = 'dnd.history';
@@ -2246,6 +2247,7 @@ import * as Edits from './edits.js';
     els.customize.addEventListener('click', openCustomize);
 
     function renderCustomize() {
+        renderBackupContents();
         // Status
         if (custom) {
             const when = custom.uploadedAt ? new Date(custom.uploadedAt).toLocaleDateString() : '';
@@ -3049,6 +3051,126 @@ import * as Edits from './edits.js';
         renderInstallOptions();
         if (!offline.record) showOffer('installed');
     });
+
+    // ---------- Backup file ----------
+    // Everything this browser keeps, downloaded as one file and restored by the user on another
+    // device. Nothing goes to the server; see backup.js for what's included.
+    const bk = {
+        contents: $('cz-backup-contents'), restore: $('cz-backup-restore'), from: $('cz-backup-from'),
+        parts: $('cz-backup-parts'), file: $('cz-backup-file'), error: $('cz-backup-error'), apply: $('cz-backup-apply'),
+    };
+    let pendingBackup = null;
+
+    const readLocal = (key) => { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } };
+
+    function renderBackupContents() {
+        const bits = [];
+        if (custom && !Edits.isEmptyRecord(custom)) bits.push(plural(custom.tables, 'table') + ' of your own');
+        if (builds.length) bits.push(plural(builds.length, 'Quick build'));
+        if (rollList.length) bits.push(plural(rollList.length, 'saved roll'));
+        if (initState.combatants.length) bits.push('the initiative tracker');
+        if (pins.length) bits.push(plural(pins.length, 'pin'));
+        bk.contents.textContent = bits.length
+            ? 'Includes ' + bits.join(', ') + ', plus your theme and settings.'
+            : 'Includes your theme and settings. Tables, builds and rolls you make will be added too.';
+    }
+
+    async function exportBackup() {
+        bk.error.textContent = '';
+        const settings = {};
+        for (const [name, key] of Object.entries(Backup.SETTINGS_KEYS)) settings[name] = readLocal(key);
+        const backup = Backup.makeBackup({
+            custom: await customData.load(),
+            builds: await userBuilds.load(),
+            rolls: await savedRolls.load(),
+            initiative: readLocal(Backup.INITIATIVE_KEY),
+            history: readLocal(Backup.HISTORY_KEY),
+            settings,
+        });
+        downloadJson(backup, Backup.backupFilename());
+        toast('Backup downloaded');
+    }
+
+    function closeRestore() {
+        pendingBackup = null;
+        bk.restore.hidden = true;
+        bk.file.value = '';
+    }
+
+    async function pickBackup(file) {
+        closeRestore();
+        bk.error.textContent = '';
+        if (!file) return;
+        if (file.size > MAX_FILE_BYTES) { bk.error.textContent = 'That file is too big to be a backup.'; return; }
+        try {
+            pendingBackup = Backup.parseBackup(await file.text());
+        } catch (err) {
+            bk.error.textContent = err instanceof ValidationError ? err.issues.join(' ') : 'Couldn’t read that file.';
+            return;
+        }
+        const when = pendingBackup.exportedAt ? new Date(pendingBackup.exportedAt) : null;
+        bk.from.textContent = 'Backup from ' + (when && !isNaN(when) ? when.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'an unknown date') + '. Choose what to restore:';
+        fill(bk.parts, el('legend', { class: 'visually-hidden', text: 'What to restore' }),
+            ...Backup.PARTS.filter((name) => pendingBackup.parts[name]).map((name) => {
+                const part = pendingBackup.parts[name];
+                const box = el('input', { type: 'checkbox', value: name });
+                box.checked = true;
+                box.addEventListener('change', updateApply);
+                return el('label', { class: 'cz-mode' }, box, el('span', {}, el('strong', { text: part.title }), el('small', { text: part.detail })));
+            }));
+        updateApply();
+        bk.restore.hidden = false;
+        bk.restore.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+
+    function chosenParts() {
+        return [...bk.parts.querySelectorAll('input:checked')].map((b) => b.value);
+    }
+    function updateApply() { bk.apply.disabled = !chosenParts().length; }
+
+    async function applyBackup() {
+        const chosen = chosenParts();
+        if (!pendingBackup || !chosen.length) return;
+        const { parts } = pendingBackup;
+        const setLocal = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+        bk.apply.disabled = true;
+        try {
+            for (const name of chosen) {
+                const { value } = parts[name];
+                if (name === 'tables') {
+                    if (Edits.isEmptyRecord(value)) await customData.clear(); else await customData.save(value);
+                } else if (name === 'builds') {
+                    await userBuilds.save(value);
+                } else if (name === 'rolls') {
+                    await savedRolls.save(value);
+                } else if (name === 'initiative') {
+                    setLocal(Backup.INITIATIVE_KEY, value);
+                } else if (name === 'history') {
+                    setLocal(Backup.HISTORY_KEY, value);
+                } else if (name === 'settings') {
+                    for (const [key, v] of Object.entries(value)) setLocal(Backup.SETTINGS_KEYS[key], v);
+                }
+            }
+        } catch {
+            bk.error.textContent = 'Couldn’t save everything in this browser (it may be out of space or in private mode). Some parts may not have been restored.';
+            bk.apply.disabled = false;
+            return;
+        }
+        // Start again from the restored data, so every part of the page picks it up
+        try { sessionStorage.setItem('dnd.restored', '1'); } catch { /* ignore */ }
+        location.reload();
+    }
+
+    $('cz-backup-export').addEventListener('click', () => exportBackup().catch(() => { bk.error.textContent = 'Couldn’t create the backup in this browser.'; }));
+    bk.file.addEventListener('change', () => pickBackup(bk.file.files[0]));
+    $('cz-backup-cancel').addEventListener('click', closeRestore);
+    bk.apply.addEventListener('click', applyBackup);
+    try {
+        if (sessionStorage.getItem('dnd.restored')) {
+            sessionStorage.removeItem('dnd.restored');
+            setTimeout(() => toast('Backup restored'), 600);
+        }
+    } catch { /* ignore */ }
 
     // ---------- Waking the server ----------
     // The free Render server sleeps when idle. The page may come from the service worker's saved

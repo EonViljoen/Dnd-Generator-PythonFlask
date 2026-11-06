@@ -2596,3 +2596,18 @@ select.be-input { appearance: auto; }
 .install-note .bi { color: var(--gold); }
 #cz-offline-error:empty { display: none; }
 #cz-offline-update[hidden] { display: none; }
+
+/* ---------- Backup ---------- */
+#cz-backup-pick { cursor: pointer; }
+#cz-backup-pick:focus-within { outline: 2px solid var(--gold); outline-offset: 2px; }
+.backup-contents { margin: 0.6rem 0 0; }
+.backup-restore {
+    margin-top: 0.85rem;
+    padding: 0.85rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    background: var(--surface-2, transparent);
+}
+.backup-restore-head { margin: 0 0 0.6rem; font-size: 0.88rem; }
+.backup-restore .cz-note { margin: 0.6rem 0 0; }
+#cz-backup-error:empty { display: none; }

@@ -60,6 +60,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 🎨 **Themes** | Five presets (Tavern, Arcane, Forest, Frost and the light Parchment), or build your own from 7 colours with a live preview and a readability check. Saved in your browser and applied before the page draws. |
 | 🔒 **Private by design** | Custom tables, builds, pins and history stay in your browser. Nothing is uploaded and there are no accounts. |
 | 📱 **Works anywhere** | Responsive layout: sidebar on desktop, scrolling category chips and a bottom result sheet on phones. |
+| 💾 **Backup file** | Download everything you've set up (your tables and edits, Quick builds, saved rolls, initiative tracker, theme and settings) as one file, then restore it on another device, choosing which parts to bring over. No accounts: it stays yours. |
 | 📲 **Offline & installable** | Install it as an app (its own window, home-screen icon). Optionally save the built-in tables (about 2 MB, only after you agree) so everything works without internet and opens instantly, even while Render's server is waking up. Saved tables update themselves when the prompts change. |
 
 ### Keyboard shortcuts
@@ -232,13 +233,14 @@ node --test tests/*.test.mjs
 │   │   ├── data.js       # Data layer: server/local sources, IndexedDB, validation
 │   │   ├── dice.js       # Dice notation parser and fair roller (no DOM, testable in Node)
 │   │   ├── initiative.js # Initiative tracker state: order, turns, HP, conditions (no DOM)
-│   │   └── edits.js      # Table editing and personal copies (no DOM)
+│   │   ├── edits.js      # Table editing and personal copies (no DOM)
+│   │   └── backup.js     # Backup file: make and check it (no DOM)
 │   ├── sw.js             # Service worker: pages and files work offline / during cold starts
 │   ├── manifest.webmanifest  # Installable app: name, icons, shortcuts
 │   ├── vendor/           # Self-hosted Bootstrap, Bootstrap Icons and fonts (with licences)
 │   ├── styles/style.css  # Theme and layout
 │   └── images/           # Favicon (SVG, ICO), Apple touch icon, app icons (192, 512, maskable)
-├── tests/                # pytest (pages, API, data) and Node tests (dice, initiative, editing)
+├── tests/                # pytest (pages, API, data) and Node tests (dice, initiative, editing, backup)
 ├── .github/workflows/    # Automated checks on every push
 ├── docs/screenshots/      # README screenshots
 ├── procfile              # Gunicorn start command
@@ -350,4 +352,4 @@ Recommended Render settings (service → **Settings**):
 - [x] Edit tables directly in the browser (entries, new tables, personal copies)
 - [x] Rename and move tables, create and rename categories
 - [x] Works offline (opt-in) and installs as an app
-- [ ] Optional accounts to sync tables and builds across devices
+- [x] Move everything to another device with a backup file (no accounts, by design)

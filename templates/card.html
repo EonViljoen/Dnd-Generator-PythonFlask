@@ -188,6 +188,34 @@
               <div id="cz-theme-custom" class="theme-custom" hidden></div>
             </section>
 
+            <!-- Backup -->
+            <section class="cz-section" id="cz-backup-section">
+              <h6 class="cz-heading"><i class="bi bi-safe"></i> Backup</h6>
+              <p class="cz-sub">Everything you've set up lives only in this browser. Download a backup file to keep it safe or move it to another device, then restore it there. No account needed.</p>
+              <div class="cz-actions">
+                <button type="button" class="btn-outline-gold btn-sm-gold" id="cz-backup-export">
+                  <i class="bi bi-download"></i> Download backup
+                </button>
+                <label class="btn-outline-gold btn-sm-gold" id="cz-backup-pick">
+                  <input type="file" id="cz-backup-file" accept=".json,application/json" class="visually-hidden">
+                  <i class="bi bi-upload"></i> Restore from a backup
+                </label>
+              </div>
+              <p class="cz-sub backup-contents" id="cz-backup-contents"></p>
+              <div class="backup-restore" id="cz-backup-restore" hidden>
+                <p class="backup-restore-head" id="cz-backup-from"></p>
+                <fieldset class="cz-modes" id="cz-backup-parts">
+                  <legend class="visually-hidden">What to restore</legend>
+                </fieldset>
+                <p class="cz-note"><i class="bi bi-info-circle"></i> Each part you tick replaces what this browser has for it. Parts you leave unticked stay as they are.</p>
+                <div class="cz-actions">
+                  <button type="button" class="btn-gold btn-sm-gold" id="cz-backup-apply"><i class="bi bi-arrow-counterclockwise"></i> Restore selected</button>
+                  <button type="button" class="link-btn" id="cz-backup-cancel">Cancel</button>
+                </div>
+              </div>
+              <p class="dice-error" id="cz-backup-error" role="alert"></p>
+            </section>
+
             <!-- Offline & app -->
             <section class="cz-section">
               <h6 class="cz-heading"><i class="bi bi-cloud-arrow-down"></i> Offline &amp; app</h6>
@@ -269,8 +297,8 @@
               </div>
               <p class="cz-note">
                 <i class="bi bi-shield-lock"></i>
-                Your file stays in this browser and is never uploaded. It won't follow you to other
-                devices, and clearing site data removes it, so keep a copy (Export) somewhere safe.
+                Your file stays in this browser and is never uploaded. Clearing site data removes it, so keep
+                a copy somewhere safe. To move it to another device, use Backup above.
               </p>
             </section>
 

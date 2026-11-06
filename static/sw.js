@@ -7,12 +7,12 @@
 //   use the saved copy. Successful responses refresh the saved copy, so a deploy shows up
 //   on the next visit while the server is awake.
 
-const CACHE = 'dnd-shell-v2'; // bump when the list of saved files changes
+const CACHE = 'dnd-shell-v3'; // bump when the list of saved files changes
 const TIMEOUT = 2500;
 const SHELL = [
     '/', '/cards',
     '/styles/style.css',
-    '/scripts/theme.js', '/scripts/app.js', '/scripts/data.js', '/scripts/dice.js', '/scripts/initiative.js', '/scripts/edits.js',
+    '/scripts/theme.js', '/scripts/app.js', '/scripts/data.js', '/scripts/dice.js', '/scripts/initiative.js', '/scripts/edits.js', '/scripts/backup.js',
     '/images/favicon.svg', '/images/favicon.ico', '/images/icon-192.png', '/images/icon-512.png',
     '/manifest.webmanifest',
     '/vendor/bootstrap/bootstrap.min.css', '/vendor/bootstrap/bootstrap.bundle.min.js',

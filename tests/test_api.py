@@ -11,7 +11,7 @@ def test_pages_render(client, path):
 
 
 @pytest.mark.parametrize('path', [
-    '/favicon.ico', '/sw.js', '/styles/style.css', '/scripts/app.js', '/scripts/theme.js', '/images/favicon.svg',
+    '/favicon.ico', '/sw.js', '/styles/style.css', '/scripts/app.js', '/scripts/backup.js', '/scripts/theme.js', '/images/favicon.svg',
 ])
 def test_static_files(client, path):
     with client.get(path) as res:  # close the file response
