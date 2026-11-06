@@ -52,7 +52,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 🔍 **Search** | Search every table name and all 10k+ prompts, with highlighted matches. |
 | 📜 **Browse tables** | View any table as a numbered, filterable list, and copy or pin individual entries. |
 | 📌 **Pins and history** | Keep the prompts you'll use tonight. Your last 10 rolls are always one click away. |
-| ✏️ **Edit tables** | Add, edit and delete entries right in a table's list (with Undo), or create a new table in any category. Editing a built-in table makes a personal copy in your browser (other users still see the original), with *Reset to original* at any time. |
+| ✏️ **Edit tables** | Add, edit and delete entries right in a table's list (with Undo), create tables and categories, and rename or move your own tables and categories (your builds, hidden tables and icons follow along). Editing a built-in table makes a personal copy in your browser (other users still see the original), with *Reset to original* at any time, or duplicate it as your own table. |
 | 🎛️ **Customize** | Hide tables you don't use, or load your own JSON, added to the defaults or replacing them, with a custom icon per category. |
 | 🔗 **Share by link** | Share a result, a custom Quick build or a saved roll with a link. The data lives in the link itself (after the `#`, which never reaches the server); opening it shows the result or offers to add the build/roll. Shared dice show the exact same roll. |
 | 🎨 **Themes** | Five presets (Tavern, Arcane, Forest, Frost and the light Parchment), or build your own from 7 colours with a live preview and a readability check. Saved in your browser and applied before the page draws. |
@@ -324,5 +324,5 @@ The app is deployed on [Render](https://render.com/) and redeploys automatically
 - [x] Dice roller tool
 - [x] Initiative tracker
 - [x] Edit tables directly in the browser (entries, new tables, personal copies)
-- [ ] Rename and move tables, create categories
+- [x] Rename and move tables, create and rename categories
 - [ ] Optional accounts to sync tables and builds across devices

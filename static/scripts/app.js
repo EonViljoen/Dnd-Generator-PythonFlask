@@ -156,6 +156,10 @@ import * as Edits from './edits.js';
             onclick: () => goToCategory(cat.name),
         }));
         {
+            items.push(el('li', {}, el('button', {
+                type: 'button', class: 'cat-btn cat-btn-add', title: 'Create a category of your own',
+                onclick: openNewCategory,
+            }, icon('plus-lg'), el('span', { text: 'New category' }))));
             items.push(el('li', { class: 'cat-nav-sep', 'aria-hidden': 'true' }));
             items.push(navButton({
                 iconName: 'lightning-charge',
@@ -273,7 +277,11 @@ import * as Edits from './edits.js';
             el('div', { class: 'content-head content-head-split' },
                 el('div', {},
                     el('div', { class: 'content-kicker', text: plural(cat.subcategories.length, 'table') + ' · ' + plural(cat.total, 'prompt') }),
-                    el('h1', { class: 'content-title', text: cat.name }),
+                    el('h1', { class: 'content-title' }, el('span', { text: cat.name }),
+                        isOwnCategory(cat.name) ? el('button', {
+                            type: 'button', class: 'icon-btn cat-rename', title: 'Rename this category', 'aria-label': 'Rename ' + cat.name,
+                            onclick: (e) => startCategoryRename(e.currentTarget.closest('.content-title'), cat.name),
+                        }, icon('pencil')) : null),
                     el('p', { class: 'content-blurb', text: cat.blurb })),
                 el('div', { class: 'content-head-tools' },
                     renderRollCount(),
@@ -285,6 +293,66 @@ import * as Edits from './edits.js';
                     }, icon('shuffle'), el('span', { text: 'Roll any table' })))),
             el('div', { class: 'tiles' }, ...cat.subcategories.map((sub) => renderTile(cat.name, sub)), renderNewTableTile(cat.name)));
     }
+
+    // A category is the user's own when it holds only their tables (or everything is theirs)
+    const isOwnCategory = (name) => !!custom?.data?.[name] && (custom.mode === 'replace' || !serverStructure.some((c) => c.name === name));
+
+    function startCategoryRename(heading, oldName) {
+        const input = el('input', { type: 'text', class: 'be-input cat-rename-input', maxlength: Edits.MAX_TABLE_NAME, 'aria-label': 'Category name', autocomplete: 'off' });
+        input.value = oldName;
+        const error = el('p', { class: 'dice-error', role: 'alert' });
+        const cancel = () => renderContent();
+        const form = el('form', {
+            class: 'cat-rename-form',
+            novalidate: true,
+            onsubmit: async (e) => {
+                e.preventDefault();
+                let res;
+                try { res = Edits.renameCategory(custom, oldName, input.value, allStructure.map((c) => c.name)); }
+                catch (err) { error.textContent = err.message; return; }
+                if (!res.changed) { cancel(); return; }
+                await remapTables(Object.keys(custom.data[oldName]).map((sub) => [oldName, sub, res.category, sub]));
+                if (!(await commitRecord(res.record))) { error.textContent = 'Could not save in this browser.'; return; }
+                goToCategory(res.category);
+                toast('Renamed to “' + res.category + '”');
+            },
+            onkeydown: (e) => { if (e.key === 'Escape') { e.stopPropagation(); cancel(); } },
+        },
+            input,
+            el('button', { type: 'submit', class: 'btn-gold btn-sm-gold' }, icon('check-lg'), el('span', { text: 'Save' })),
+            el('button', { type: 'button', class: 'link-btn', onclick: cancel }, 'Cancel'),
+            error);
+        heading.replaceWith(form);
+        input.focus();
+        input.select();
+    }
+
+    // ---- New category (from the sidebar) ----
+    const nc = { modalEl: $('newCategoryModal'), form: $('new-category-form'), category: $('nc-category'), table: $('nc-table'), entry: $('nc-entry'), error: $('nc-error') };
+    const ncModal = new bootstrap.Modal(nc.modalEl);
+    function openNewCategory() {
+        nc.form.reset();
+        nc.error.textContent = '';
+        ncModal.show();
+    }
+    nc.modalEl.addEventListener('shown.bs.modal', () => nc.category.focus());
+    nc.form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        nc.error.textContent = '';
+        const name = nc.category.value.trim();
+        const existing = allStructure.find((c) => c.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+            nc.error.textContent = 'There’s already a category called “' + existing.name + '”. Add a table to it with “+ New table” instead.';
+            return;
+        }
+        let res;
+        try { res = Edits.createTable(custom, name, nc.table.value, nc.entry.value, []); }
+        catch (err) { nc.error.textContent = err.message; return; }
+        if (!(await commitRecord(res.record))) { nc.error.textContent = 'Could not save in this browser.'; return; }
+        ncModal.hide();
+        goToCategory(res.category);
+        toast('Created the “' + res.category + '” category');
+    });
 
     // "+ New table" tile: turns into a small form
     function renderNewTableTile(category) {
@@ -1828,18 +1896,133 @@ import * as Edits from './edits.js';
         if (status === 'builtin') {
             box('info-circle', 'This is a built-in table',
                 el('p', { text: 'Your first change makes a personal copy of it, saved only in this browser. From then on you’ll see your version, while other users of the site still see the original table.' }),
-                el('p', { text: 'While you have a copy, updates to the built-in table won’t reach you. You can reset to the original at any time, and you can export your tables from Customize as a backup.' }));
+                el('p', { text: 'While you have a copy, updates to the built-in table won’t reach you. You can reset to the original at any time, and you can export your tables from Customize as a backup.' }),
+                el('p', { text: 'Built-in tables keep their name and category. To rename or move one, duplicate it as your own table.' }),
+                infoActions(duplicateButton()));
         } else if (status === 'copy') {
             box('pencil-square', 'You’re editing your personal copy',
                 el('p', { text: 'This copy of a built-in table is saved only in this browser. Other users of the site still see the original table, and updates to the built-in table won’t reach your copy.' }),
-                el('div', { class: 'edit-info-actions' },
-                    el('button', { type: 'button', class: 'btn-outline-gold btn-sm-gold', onclick: resetToOriginal }, icon('arrow-counterclockwise'), ' Reset to original')));
+                infoActions(
+                    el('button', { type: 'button', class: 'btn-outline-gold btn-sm-gold', onclick: resetToOriginal }, icon('arrow-counterclockwise'), ' Reset to original'),
+                    duplicateButton()));
         } else {
             box('journal-bookmark', 'This table is yours',
                 el('p', { text: 'It’s saved only in this browser. Export your tables from Customize to keep a backup or move them to another device.' }),
-                el('div', { class: 'edit-info-actions' },
+                infoActions(
+                    el('button', {
+                        type: 'button', class: 'btn-outline-gold btn-sm-gold',
+                        onclick: () => showTableForm({
+                            title: 'Rename or move this table', name: sub, category, submit: 'Save',
+                            onSubmit: (newCat, newSub) => moveThisTable(newCat, newSub),
+                        }),
+                    }, icon('pencil-square'), ' Rename or move'),
                     el('button', { type: 'button', class: 'btn-outline-danger-ink btn-sm-gold', onclick: deleteThisTable }, icon('trash'), ' Delete table')));
         }
+    }
+
+    // Actions row + a holder for the inline name/category form
+    function infoActions(...buttons) {
+        return el('div', {}, el('div', { class: 'edit-info-actions' }, ...buttons), el('div', { class: 'edit-info-form', id: 'edit-info-form' }));
+    }
+
+    function duplicateButton() {
+        const { category, sub } = modalTable;
+        return el('button', {
+            type: 'button', class: 'btn-outline-gold btn-sm-gold',
+            title: 'Make a separate table of your own with these entries, which you can rename and move',
+            onclick: () => showTableForm({
+                title: 'Duplicate as my own table', name: sub + ' (mine)', category, submit: 'Duplicate',
+                onSubmit: (newCat, newSub) => duplicateThisTable(newCat, newSub),
+            }),
+        }, icon('copy'), ' Duplicate as my own table');
+    }
+
+    // Small form: table name + category (existing or new)
+    function showTableForm({ title, name, category, submit, onSubmit }) {
+        const holder = $('edit-info-form');
+        if (!holder) return;
+        const nameInput = el('input', { type: 'text', class: 'be-input', maxlength: Edits.MAX_TABLE_NAME, 'aria-label': 'Table name', autocomplete: 'off' });
+        nameInput.value = name;
+        const NEW = '__new__';
+        const select = el('select', { class: 'be-input', 'aria-label': 'Category' },
+            ...allStructure.map((c) => { const o = el('option', { value: c.name, text: c.name }); o.selected = c.name === category; return o; }),
+            el('option', { value: NEW, text: '+ New category…' }));
+        const newCat = el('input', { type: 'text', class: 'be-input', maxlength: Edits.MAX_TABLE_NAME, placeholder: 'New category name', 'aria-label': 'New category name', autocomplete: 'off', hidden: true });
+        select.addEventListener('change', () => { newCat.hidden = select.value !== NEW; if (!newCat.hidden) newCat.focus(); });
+        const error = el('p', { class: 'dice-error', role: 'alert' });
+        const form = el('form', {
+            class: 'table-form',
+            novalidate: true,
+            onsubmit: async (e) => {
+                e.preventDefault();
+                error.textContent = '';
+                const cat = select.value === NEW ? newCat.value : select.value;
+                const msg = await onSubmit(cat, nameInput.value);
+                if (msg) error.textContent = msg;
+            },
+            onkeydown: (e) => { if (e.key === 'Escape') { e.stopPropagation(); fill(holder); } },
+        },
+            el('strong', { class: 'table-form-title', text: title }),
+            el('div', { class: 'table-form-fields' },
+                el('label', { class: 'be-field' }, el('span', { text: 'Name' }), nameInput),
+                el('label', { class: 'be-field' }, el('span', { text: 'Category' }), select, newCat)),
+            error,
+            el('div', { class: 'table-form-actions' },
+                el('button', { type: 'button', class: 'link-btn', onclick: () => fill(holder) }, 'Cancel'),
+                el('button', { type: 'submit', class: 'btn-gold btn-sm-gold' }, icon('check-lg'), el('span', { text: submit }))));
+        fill(holder, form);
+        nameInput.focus();
+        nameInput.select();
+    }
+
+    const tableNamesIn = (category) => allStructure.find((c) => c.name === category)?.subcategories.map((s) => s.name) || [];
+
+    // Rename/move an own table. Returns an error message, or nothing on success.
+    async function moveThisTable(newCat, newSub) {
+        const { category, sub } = modalTable;
+        let res;
+        try { res = Edits.moveTable(custom, category, sub, newCat, newSub, tableNamesIn(String(newCat).trim())); }
+        catch (err) { return err.message; }
+        if (!res.changed) { fill($('edit-info-form')); return; }
+        await remapTables([[category, sub, res.category, res.sub]]);
+        if (!(await commitRecord(res.record))) return 'Could not save in this browser.';
+        modalTable.category = res.category;
+        modalTable.sub = res.sub;
+        els.modalKicker.textContent = res.category;
+        els.modalTitle.textContent = res.sub;
+        if (view?.type === 'category') goToCategory(res.category);
+        renderEditInfo();
+        renderEntries();
+        toast(res.category !== category ? 'Moved to ' + res.category + ' › ' + res.sub : 'Renamed to “' + res.sub + '”');
+    }
+
+    async function duplicateThisTable(newCat, newSub) {
+        let res;
+        try { res = Edits.createTableFrom(custom, newCat, newSub, modalTable.entries, tableNamesIn(String(newCat).trim())); }
+        catch (err) { return err.message; }
+        if (!(await commitRecord(res.record))) return 'Could not save in this browser.';
+        goToCategory(res.category);
+        toast('Created your own table “' + res.sub + '”');
+        showEntries(res.category, res.sub, { edit: true });
+    }
+
+    // After a rename/move, keep everything that refers to a table by name pointing at it
+    async function remapTables(pairs) {
+        let hiddenChanged = false, seenChanged = false, buildsChanged = false;
+        for (const [oldCat, oldSub, newCat, newSub] of pairs) {
+            const from = keyOf(oldCat, oldSub), to = keyOf(newCat, newSub);
+            if (hidden.has(from)) { hidden.delete(from); hidden.add(to); hiddenChanged = true; }
+            if (seen[from]) { seen[to] = seen[from]; delete seen[from]; seenChanged = true; }
+            if (activeKey === from) activeKey = to;
+            builds = builds.map((b) => {
+                if (!b.parts.some((p) => p.category === oldCat && p.sub === oldSub)) return b;
+                buildsChanged = true;
+                return { ...b, parts: b.parts.map((p) => (p.category === oldCat && p.sub === oldSub ? { ...p, category: newCat, sub: newSub } : p)) };
+            });
+        }
+        if (hiddenChanged) save(HIDDEN_KEY, [...hidden]);
+        if (seenChanged) save(SEEN_KEY, seen);
+        if (buildsChanged) { try { await userBuilds.save(builds); } catch { /* the builds stay renamed in memory */ } }
     }
 
     // Save a new custom record (or remove it when nothing is left), then reload the data

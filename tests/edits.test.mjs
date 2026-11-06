@@ -72,3 +72,41 @@ test('replace mode: every table is the user\'s own', () => {
     assert.equal(copied, false);
     assert.deepEqual(record.overrides, []);
 });
+
+import { createTableFrom, moveTable, renameCategory, cleanName } from '../static/scripts/edits.js';
+
+test('names: trimmed, required, no "|"', () => {
+    assert.equal(cleanName('  Omens ', 'table'), 'Omens');
+    assert.throws(() => cleanName('a|b', 'table'), /can’t contain/);
+    assert.throws(() => cleanName('   ', 'category'), /Give the category a name/);
+    assert.throws(() => createTable(null, 'Town', 'x|y', 'e'), /can’t contain/);
+});
+
+test('duplicate a built-in table as an own table', () => {
+    const { record, category, sub } = createTableFrom(null, 'Town', 'Waterdeep Rumors', base.Town.Rumors, ['Rumors', 'Laws']);
+    assert.deepEqual([category, sub, record.data.Town['Waterdeep Rumors']], ['Town', 'Waterdeep Rumors', ['A', 'B', 'C']]);
+    assert.deepEqual(record.overrides, []); // an own table, not a personal copy
+    assert.deepEqual(mergeData(base, record.data, record.overrides).Town.Rumors, ['A', 'B', 'C']);
+});
+
+test('rename and move own tables (case-only rename allowed, clashes refused)', () => {
+    let { record } = createTable(null, 'Homebrew', 'omens', 'Red moon');
+    let moved = moveTable(record, 'Homebrew', 'omens', 'Homebrew', 'Omens', ['omens']);
+    assert.deepEqual(Object.keys(moved.record.data.Homebrew), ['Omens']);
+    moved = moveTable(moved.record, 'Homebrew', 'Omens', 'Sky Signs', 'Moon Omens', []);
+    assert.deepEqual(moved.record.data, { 'Sky Signs': { 'Moon Omens': ['Red moon'] } }); // empty category removed
+    assert.equal(moved.changed, true);
+    assert.throws(() => moveTable(moved.record, 'Sky Signs', 'Moon Omens', 'Town', 'rumors', ['Rumors']), /already a table/);
+    assert.equal(moveTable(moved.record, 'Sky Signs', 'Moon Omens', 'Sky Signs', 'Moon Omens').changed, false);
+});
+
+test('rename an own category: tables and icon move with it', () => {
+    let { record } = createTable(null, 'Homebrew', 'Omens', 'Red moon');
+    record = { ...record, icons: { Homebrew: 'moon-stars' } };
+    const { record: r2, category } = renameCategory(record, 'Homebrew', 'Sky Signs', ['Town', 'Homebrew']);
+    assert.equal(category, 'Sky Signs');
+    assert.deepEqual(r2.data, { 'Sky Signs': { Omens: ['Red moon'] } });
+    assert.deepEqual(r2.icons, { 'Sky Signs': 'moon-stars' });
+    assert.throws(() => renameCategory(record, 'Homebrew', 'town', ['Town', 'Homebrew']), /already a category/);
+    assert.equal(renameCategory(record, 'Homebrew', 'homebrew', ['Town', 'Homebrew']).changed, true); // case-only
+});

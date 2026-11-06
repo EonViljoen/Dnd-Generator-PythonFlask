@@ -111,16 +111,65 @@ function removeTable(r, category, sub) {
 export const resetTable = (record, category, sub) => removeTable(clone(record), category, sub);
 export const deleteTable = (record, category, sub) => removeTable(clone(record), category, sub);
 
+// Names are joined as "category|table" internally, so "|" isn't allowed in them
+export function cleanName(name, what) {
+    const n = String(name ?? '').trim();
+    if (!n) throw new Error('Give the ' + what + ' a name.');
+    if (n.length > MAX_TABLE_NAME) throw new Error(what[0].toUpperCase() + what.slice(1) + ' names can be up to ' + MAX_TABLE_NAME + ' characters.');
+    if (n.includes('|')) throw new Error('Names can’t contain “|”.');
+    return n;
+}
+
+const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+
 // existingNames: every table name currently in the category (built-in and custom)
 export function createTable(record, category, name, firstEntry, existingNames = []) {
-    const sub = String(name ?? '').trim();
-    if (!sub) throw new Error('Give the table a name.');
-    if (sub.length > MAX_TABLE_NAME) throw new Error('Table names can be up to ' + MAX_TABLE_NAME + ' characters.');
-    if (existingNames.some((n) => n.toLowerCase() === sub.toLowerCase())) throw new Error('There’s already a table called “' + sub + '” here.');
+    return createTableFrom(record, category, name, [firstEntry], existingNames);
+}
+
+// New own table from a list of entries (also used to duplicate a built-in table)
+export function createTableFrom(record, category, name, entries, existingNames = []) {
+    const cat = cleanName(category, 'category');
+    const sub = cleanName(name, 'table');
+    const taken = existingNames.find((n) => sameName(n, sub));
+    if (taken) throw new Error('There’s already a table called “' + taken + '” in ' + cat + '.');
+    const cleaned = entries.map(cleanText);
+    if (!cleaned.length) throw new Error('A table needs at least one entry.');
     const r = clone(record || emptyRecord());
-    r.data[category] = r.data[category] || {};
-    r.data[category][sub] = [cleanText(firstEntry)];
-    return { record: recount(r), sub };
+    r.data[cat] = r.data[cat] || {};
+    r.data[cat][sub] = cleaned;
+    return { record: recount(r), category: cat, sub };
+}
+
+// Rename and/or move an own table. targetNames: table names already in the target category.
+export function moveTable(record, fromCat, fromSub, toCat, toSub, targetNames = []) {
+    const r = clone(record);
+    const entries = tableOf(r, fromCat, fromSub);
+    const cat = cleanName(toCat, 'category');
+    const sub = cleanName(toSub, 'table');
+    if (cat === fromCat && sub === fromSub) return { record: recount(r), category: cat, sub, changed: false };
+    const clash = targetNames.find((n) => sameName(n, sub) && !(cat === fromCat && n === fromSub));
+    if (clash) throw new Error('There’s already a table called “' + clash + '” in ' + cat + '.');
+    delete r.data[fromCat][fromSub];
+    if (!Object.keys(r.data[fromCat]).length) delete r.data[fromCat];
+    r.data[cat] = r.data[cat] || {};
+    r.data[cat][sub] = entries;
+    return { record: recount(r), category: cat, sub, changed: true };
+}
+
+// Rename an own category (all of its tables move with it, and its icon). otherCategories: every other category name.
+export function renameCategory(record, fromCat, toCat, otherCategories = []) {
+    const r = clone(record);
+    if (!r.data[fromCat]) throw new Error('That category isn’t editable.');
+    const cat = cleanName(toCat, 'category');
+    if (cat === fromCat) return { record: recount(r), category: cat, changed: false };
+    const clash = otherCategories.find((n) => n !== fromCat && sameName(n, cat));
+    if (clash) throw new Error('There’s already a category called “' + clash + '”.');
+    r.data[cat] = { ...(r.data[cat] || {}), ...r.data[fromCat] };
+    delete r.data[fromCat];
+    if (r.icons[fromCat]) { r.icons[cat] = r.icons[fromCat]; delete r.icons[fromCat]; }
+    r.overrides = r.overrides.map((k) => (k.startsWith(fromCat + '|') ? cat + k.slice(fromCat.length) : k));
+    return { record: recount(r), category: cat, changed: true };
 }
 
 // True when nothing is left worth keeping (no tables, no icon choices): the record can be removed

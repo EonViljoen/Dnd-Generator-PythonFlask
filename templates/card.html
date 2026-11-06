@@ -118,6 +118,32 @@
       </div>
     </div>
 
+    <!-- New category -->
+    <div class="modal fade" id="newCategoryModal" tabindex="-1" aria-labelledby="newCategoryLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <form class="modal-content" id="new-category-form" novalidate>
+          <div class="modal-header">
+            <div class="flex-grow-1">
+              <div class="modal-kicker">Your tables</div>
+              <h5 class="modal-title" id="newCategoryLabel">New category</h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body nc-body">
+            <p class="cz-sub">A category holds tables, so start it with its first table and entry. You can pick its sidebar icon in Customize. Saved only in this browser.</p>
+            <label class="be-field"><span>Category name</span><input type="text" id="nc-category" class="be-input" maxlength="120" placeholder="e.g. Sky Signs" autocomplete="off"></label>
+            <label class="be-field"><span>First table</span><input type="text" id="nc-table" class="be-input" maxlength="120" placeholder="e.g. Moon Omens" autocomplete="off"></label>
+            <label class="be-field"><span>First entry</span><textarea id="nc-entry" class="be-input" rows="2" maxlength="5000" placeholder="e.g. A red moon rises: the dead grow restless."></textarea></label>
+            <p class="dice-error" id="nc-error" role="alert"></p>
+          </div>
+          <div class="modal-footer be-footer">
+            <button type="button" class="btn-outline-gold" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn-gold"><i class="bi bi-check-lg"></i> Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Customize modal -->
     <div class="modal fade" id="customizeModal" tabindex="-1" aria-labelledby="customizeModalLabel" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-scrollable">
