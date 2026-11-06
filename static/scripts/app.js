@@ -1827,11 +1827,11 @@ import * as Edits from './edits.js';
         ed.info.className = 'edit-info is-' + status;
         if (status === 'builtin') {
             box('info-circle', 'This is a built-in table',
-                el('p', { text: 'Your first change makes a personal copy of it, saved only in this browser. From then on you’ll see your version; everyone else still sees the original.' }),
+                el('p', { text: 'Your first change makes a personal copy of it, saved only in this browser. From then on you’ll see your version, while other users of the site still see the original table.' }),
                 el('p', { text: 'While you have a copy, updates to the built-in table won’t reach you. You can reset to the original at any time, and you can export your tables from Customize as a backup.' }));
         } else if (status === 'copy') {
             box('pencil-square', 'You’re editing your personal copy',
-                el('p', { text: 'This copy of a built-in table is saved only in this browser. Others still see the original, and updates to the built-in table won’t reach your copy.' }),
+                el('p', { text: 'This copy of a built-in table is saved only in this browser. Other users of the site still see the original table, and updates to the built-in table won’t reach your copy.' }),
                 el('div', { class: 'edit-info-actions' },
                     el('button', { type: 'button', class: 'btn-outline-gold btn-sm-gold', onclick: resetToOriginal }, icon('arrow-counterclockwise'), ' Reset to original')));
         } else {
@@ -1877,7 +1877,7 @@ import * as Edits from './edits.js';
         editingIndex = null;
         renderEditInfo();
         renderEntries();
-        if (extra.copied) toast('Personal copy created. Only you see these changes');
+        if (extra.copied) toast('Personal copy created. Other users still see the original');
         return extra;
     }
 
