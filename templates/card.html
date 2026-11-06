@@ -125,13 +125,17 @@
             <!-- Rolling -->
             <section class="cz-section">
               <h6 class="cz-heading"><i class="bi bi-arrow-repeat"></i> Rolling</h6>
-              <label class="cz-switch">
-                <input type="checkbox" id="cz-no-repeat" role="switch">
-                <span>
-                  <strong>Don't repeat prompts</strong>
-                  <small>Each table gives out every entry once before any can come up again. Tiles show how many are left. Remembered in this browser.</small>
-                </span>
-              </label>
+              <fieldset class="cz-modes">
+                <legend class="visually-hidden">Repeats</legend>
+                <label class="cz-mode">
+                  <input type="radio" name="cz-repeat" value="allow">
+                  <span><strong>Allow repeats</strong><small>Every roll picks from the whole table, so the same prompt can come up again.</small></span>
+                </label>
+                <label class="cz-mode">
+                  <input type="radio" name="cz-repeat" value="none">
+                  <span><strong>Don't repeat prompts</strong><small>Each table gives out every entry once before any can come up again. Tiles show how many are left.</small></span>
+                </label>
+              </fieldset>
               <div class="cz-repeat-foot" id="cz-repeat-foot" hidden>
                 <span id="cz-seen-count" class="cz-vis-count"></span>
                 <button type="button" class="link-btn" id="cz-start-fresh">Start fresh</button>

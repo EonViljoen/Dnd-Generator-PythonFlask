@@ -1852,10 +1852,10 @@ import * as Init from './initiative.js';
     }
 
     // ---------- Rolling options (no repeats) ----------
-    const rollingUi = { toggle: $('cz-no-repeat'), foot: $('cz-repeat-foot'), count: $('cz-seen-count'), fresh: $('cz-start-fresh') };
+    const rollingUi = { radios: () => document.querySelectorAll('input[name="cz-repeat"]'), foot: $('cz-repeat-foot'), count: $('cz-seen-count'), fresh: $('cz-start-fresh') };
 
     function renderRollingOptions() {
-        rollingUi.toggle.checked = noRepeat;
+        for (const r of rollingUi.radios()) r.checked = r.value === (noRepeat ? 'none' : 'allow');
         const seenTotal = Object.keys(seen).reduce((n, key) => {
             const [category, sub] = key.split('|');
             return n + seenIn(category, sub).length;
@@ -1864,11 +1864,14 @@ import * as Init from './initiative.js';
         rollingUi.count.textContent = seenTotal ? plural(seenTotal, 'prompt') + ' seen so far' : 'Nothing seen yet';
         rollingUi.fresh.hidden = !seenTotal;
     }
-    rollingUi.toggle.addEventListener('change', () => {
-        setNoRepeat(rollingUi.toggle.checked);
-        renderRollingOptions();
-        toast(noRepeat ? 'No repeats: each table goes through every entry first' : 'Repeats allowed again');
-    });
+    for (const radio of rollingUi.radios()) {
+        radio.addEventListener('change', () => {
+            if (!radio.checked) return;
+            setNoRepeat(radio.value === 'none');
+            renderRollingOptions();
+            toast(noRepeat ? 'No repeats: each table goes through every entry first' : 'Repeats allowed again');
+        });
+    }
     rollingUi.fresh.addEventListener('click', () => {
         startFresh();
         renderRollingOptions();
