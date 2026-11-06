@@ -88,7 +88,23 @@
               <div class="modal-kicker" id="entriesModalKicker"></div>
               <h5 class="modal-title" id="entriesModalLabel"></h5>
             </div>
+            <button type="button" class="btn-outline-gold btn-sm-gold entries-edit-toggle" id="entries-edit" aria-pressed="false" title="Add, edit or remove entries">
+              <i class="bi bi-pencil" aria-hidden="true"></i> <span>Edit</span>
+            </button>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="edit-panel" id="entries-edit-panel" hidden>
+            <div class="edit-info" id="entries-info" role="note"></div>
+            <form class="edit-add" id="entries-add" novalidate>
+              <label class="visually-hidden" for="entries-add-text">New entry</label>
+              <textarea id="entries-add-text" class="be-input" rows="2" maxlength="5000" placeholder="Write a new entry… (Ctrl/⌘ + Enter to add)"></textarea>
+              <button type="submit" class="btn-gold btn-sm-gold"><i class="bi bi-plus-lg"></i> Add</button>
+            </form>
+            <p class="dice-error" id="entries-edit-error" role="alert"></p>
+            <div class="edit-undo" id="entries-undo" role="status" hidden>
+              <span id="entries-undo-text"></span>
+              <button type="button" class="link-btn" id="entries-undo-btn">Undo</button>
+            </div>
           </div>
           <div class="modal-filter">
             <i class="bi bi-funnel" aria-hidden="true"></i>

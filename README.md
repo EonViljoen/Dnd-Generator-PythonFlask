@@ -52,6 +52,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 🔍 **Search** | Search every table name and all 10k+ prompts, with highlighted matches. |
 | 📜 **Browse tables** | View any table as a numbered, filterable list, and copy or pin individual entries. |
 | 📌 **Pins and history** | Keep the prompts you'll use tonight. Your last 10 rolls are always one click away. |
+| ✏️ **Edit tables** | Add, edit and delete entries right in a table's list (with Undo), or create a new table in any category. Editing a built-in table makes a personal copy that only you see, with *Reset to original* at any time. |
 | 🎛️ **Customize** | Hide tables you don't use, or load your own JSON, added to the defaults or replacing them, with a custom icon per category. |
 | 🔗 **Share by link** | Share a result, a custom Quick build or a saved roll with a link. The data lives in the link itself (after the `#`, which never reaches the server); opening it shows the result or offers to add the build/roll. Shared dice show the exact same roll. |
 | 🎨 **Themes** | Five presets (Tavern, Arcane, Forest, Frost and the light Parchment), or build your own from 7 colours with a live preview and a readability check. Saved in your browser and applied before the page draws. |
@@ -189,7 +190,7 @@ Then open <http://localhost:5001>. The generator is at `/cards`.
 
 Run `deactivate` to leave the virtual environment.
 
-**Tests:** the dice engine and initiative tracker have unit tests that run with Node's built-in test runner (Node 18+):
+**Tests:** the dice engine, initiative tracker and table editing have unit tests that run with Node's built-in test runner (Node 18+):
 
 ```bash
 node --test tests/*.test.mjs
@@ -215,11 +216,12 @@ node --test tests/*.test.mjs
 │   │   ├── app.js        # Generator UI (ES module)
 │   │   ├── data.js       # Data layer: server/local sources, IndexedDB, validation
 │   │   ├── dice.js       # Dice notation parser and fair roller (no DOM, testable in Node)
-│   │   └── initiative.js # Initiative tracker state: order, turns, HP, conditions (no DOM)
+│   │   ├── initiative.js # Initiative tracker state: order, turns, HP, conditions (no DOM)
+│   │   └── edits.js      # Table editing and personal copies (no DOM)
 │   ├── sw.js             # Service worker: instant pages during Render cold starts
 │   ├── styles/style.css  # Theme and layout
 │   └── images/           # Favicon (SVG, ICO) and Apple touch icon
-├── tests/                # Node tests for the dice engine and initiative tracker
+├── tests/                # Node tests: dice engine, initiative tracker, table editing
 ├── docs/screenshots/      # README screenshots
 ├── procfile              # Gunicorn start command
 └── .render.yaml          # Render service config
@@ -321,5 +323,6 @@ The app is deployed on [Render](https://render.com/) and redeploys automatically
 - [x] Custom JSON tables and show/hide, kept in the browser
 - [x] Dice roller tool
 - [x] Initiative tracker
-- [ ] Edit tables directly in the browser
+- [x] Edit tables directly in the browser (entries, new tables, personal copies)
+- [ ] Rename and move tables, create categories
 - [ ] Optional accounts to sync tables and builds across devices

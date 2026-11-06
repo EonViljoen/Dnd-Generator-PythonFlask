@@ -8,6 +8,7 @@ import {
 } from './data.js';
 import * as Dice from './dice.js';
 import * as Init from './initiative.js';
+import * as Edits from './edits.js';
 
 {
     const HISTORY_KEY = 'dnd.history';
@@ -282,8 +283,51 @@ import * as Init from './initiative.js';
                         title: 'Roll on a random ' + cat.name + ' table',
                         onclick: () => rollRandomTable(cat),
                     }, icon('shuffle'), el('span', { text: 'Roll any table' })))),
-            el('div', { class: 'tiles' }, ...cat.subcategories.map((sub) => renderTile(cat.name, sub))));
+            el('div', { class: 'tiles' }, ...cat.subcategories.map((sub) => renderTile(cat.name, sub)), renderNewTableTile(cat.name)));
     }
+
+    // "+ New table" tile: turns into a small form
+    function renderNewTableTile(category) {
+        const tile = el('button', {
+            type: 'button',
+            class: 'tile-new',
+            title: 'Create your own table in ' + category,
+            onclick: () => tile.replaceWith(renderNewTableForm(category)),
+        }, icon('plus-lg'), el('span', { text: 'New table' }));
+        return tile;
+    }
+
+    function renderNewTableForm(category) {
+        const name = el('input', { type: 'text', class: 'be-input', maxlength: Edits.MAX_TABLE_NAME, placeholder: 'Table name', 'aria-label': 'New table name', autocomplete: 'off' });
+        const first = el('textarea', { class: 'be-input', rows: 2, maxlength: Edits.MAX_ENTRY_LENGTH, placeholder: 'First entry', 'aria-label': 'First entry' });
+        const error = el('p', { class: 'dice-error', role: 'alert' });
+        const form = el('form', {
+            class: 'tile-new-form',
+            novalidate: true,
+            onsubmit: async (e) => {
+                e.preventDefault();
+                error.textContent = '';
+                const existing = allStructure.find((c) => c.name === category)?.subcategories.map((s) => s.name) || [];
+                let created;
+                try { created = Edits.createTable(custom, category, name.value, first.value, existing); }
+                catch (err) { error.textContent = err.message; return; }
+                if (!(await commitRecord(created.record))) { error.textContent = 'Could not save in this browser.'; return; }
+                toast('Created “' + created.sub + '”. Add more entries now');
+                showEntries(category, created.sub, { edit: true });
+            },
+            onkeydown: (e) => { if (e.key === 'Escape') { e.stopPropagation(); form.replaceWith(renderNewTableTile(category)); } },
+        },
+            el('div', { class: 'tile-new-head' }, icon('journal-plus'), el('strong', { text: 'New table' })),
+            name, first, error,
+            el('div', { class: 'tile-new-actions' },
+                el('button', { type: 'button', class: 'link-btn', onclick: () => form.replaceWith(renderNewTableTile(category)) }, 'Cancel'),
+                el('button', { type: 'submit', class: 'btn-gold btn-sm-gold' }, icon('check-lg'), el('span', { text: 'Create' }))));
+        setTimeout(() => name.focus(), 0);
+        return form;
+    }
+
+    const isBuiltInTable = (category, sub) => serverStructure.some((c) => c.name === category && c.subcategories.some((s) => s.name === sub));
+    const editStatus = (category, sub) => Edits.tableStatus(custom, category, sub, isBuiltInTable(category, sub));
 
     // "Roll ×1 ×2 ×3 ×5": how many different entries a table roll gives
     function renderRollCount() {
@@ -302,6 +346,14 @@ import * as Init from './initiative.js';
             }, '×' + n)));
     }
 
+    function tileBadge(category, sub) {
+        if (!custom || custom.mode === 'replace') return null;
+        const status = editStatus(category, sub);
+        if (status === 'copy') return el('span', { class: 'tile-badge', title: 'Your personal copy of a built-in table', text: 'Edited' });
+        if (status === 'own') return el('span', { class: 'tile-badge is-own', title: 'Your own table', text: 'Yours' });
+        return null;
+    }
+
     function renderTile(category, sub, { showCategory = false, needle = '' } = {}) {
         return el('div', { class: 'tile' + (activeKey === keyOf(category, sub.name) ? ' active' : ''), 'data-key': keyOf(category, sub.name) },
             el('button', {
@@ -310,7 +362,7 @@ import * as Init from './initiative.js';
                 title: 'Roll on ' + sub.name,
                 onclick: () => roll(category, sub.name),
             },
-                el('span', { class: 'tile-name' }, highlight(sub.name, needle)),
+                el('span', { class: 'tile-name' }, highlight(sub.name, needle), tileBadge(category, sub.name)),
                 el('span', { class: 'tile-meta' },
                     icon('dice-5'),
                     el('span', { class: 'tile-count', text: (showCategory ? category + ' · ' : '') + tileCountText(category, sub) }))),
@@ -1676,9 +1728,19 @@ import * as Init from './initiative.js';
     const modalEl = $('entriesModal');
     const modal = new bootstrap.Modal(modalEl);
     let modalTable = null; // { category, sub, entries }
+    let modalEdit = false;  // edit mode on/off
+    let editingIndex = null; // entry being edited inline
+    let lastDeleted = null;  // { category, sub, index, text } for Undo
+    let undoTimer;
+    const ed = {
+        toggle: $('entries-edit'), panel: $('entries-edit-panel'), info: $('entries-info'),
+        add: $('entries-add'), addText: $('entries-add-text'), error: $('entries-edit-error'),
+        undo: $('entries-undo'), undoText: $('entries-undo-text'), undoBtn: $('entries-undo-btn'),
+    };
 
-    async function showEntries(category, sub) {
+    async function showEntries(category, sub, { edit = false } = {}) {
         modalTable = { category, sub, entries: [] };
+        setEditMode(edit);
         els.modalKicker.textContent = category;
         els.modalTitle.textContent = sub;
         els.modalFilter.value = '';
@@ -1702,6 +1764,7 @@ import * as Init from './initiative.js';
         const rows = [];
         entries.forEach((text, i) => {
             if (lower && !text.toLowerCase().includes(lower)) return;
+            if (modalEdit) { rows.push(renderEditableEntry(text, i, needle)); return; }
             const item = { category, sub, text };
             const pinned = isPinned(item);
             rows.push(el('li', { value: i + 1 },
@@ -1734,6 +1797,177 @@ import * as Init from './initiative.js';
     }
 
     els.modalFilter.addEventListener('input', () => modalTable && renderEntries());
+
+    // ----- Edit mode -----
+    function setEditMode(on) {
+        modalEdit = on;
+        editingIndex = null;
+        ed.toggle.setAttribute('aria-pressed', String(on));
+        fill(ed.toggle, icon(on ? 'check-lg' : 'pencil'), ' ', el('span', { text: on ? 'Done' : 'Edit' }));
+        ed.panel.hidden = !on;
+        ed.error.textContent = '';
+        hideUndo();
+        modalEl.classList.toggle('is-editing', on);
+        if (on) renderEditInfo();
+    }
+    ed.toggle.addEventListener('click', () => {
+        if (!modalTable) return;
+        setEditMode(!modalEdit);
+        renderEntries();
+        if (modalEdit) ed.addText.focus();
+    });
+
+    // The info panel explains what editing does for this kind of table
+    function renderEditInfo() {
+        const { category, sub } = modalTable;
+        const status = editStatus(category, sub);
+        const box = (iconName, title, ...body) => fill(ed.info,
+            el('div', { class: 'edit-info-icon' }, icon(iconName)),
+            el('div', { class: 'edit-info-body' }, el('strong', { text: title }), ...body));
+        ed.info.className = 'edit-info is-' + status;
+        if (status === 'builtin') {
+            box('info-circle', 'This is a built-in table',
+                el('p', { text: 'Your first change makes a personal copy of it, saved only in this browser. From then on you’ll see your version; everyone else still sees the original.' }),
+                el('p', { text: 'While you have a copy, updates to the built-in table won’t reach you. You can reset to the original at any time, and you can export your tables from Customize as a backup.' }));
+        } else if (status === 'copy') {
+            box('pencil-square', 'You’re editing your personal copy',
+                el('p', { text: 'This copy of a built-in table is saved only in this browser. Others still see the original, and updates to the built-in table won’t reach your copy.' }),
+                el('div', { class: 'edit-info-actions' },
+                    el('button', { type: 'button', class: 'btn-outline-gold btn-sm-gold', onclick: resetToOriginal }, icon('arrow-counterclockwise'), ' Reset to original')));
+        } else {
+            box('journal-bookmark', 'This table is yours',
+                el('p', { text: 'It’s saved only in this browser. Export your tables from Customize to keep a backup or move them to another device.' }),
+                el('div', { class: 'edit-info-actions' },
+                    el('button', { type: 'button', class: 'btn-outline-danger-ink btn-sm-gold', onclick: deleteThisTable }, icon('trash'), ' Delete table')));
+        }
+    }
+
+    // Save a new custom record (or remove it when nothing is left), then reload the data
+    async function commitRecord(record) {
+        try {
+            if (record && !Edits.isEmptyRecord(record)) await customData.save(record);
+            else await customData.clear();
+        } catch {
+            return false;
+        }
+        await loadSource();
+        refresh();
+        return true;
+    }
+
+    // Apply one edit to the open table: makes the personal copy first if needed
+    async function editTable(op) {
+        const { category, sub } = modalTable;
+        ed.error.textContent = '';
+        let next, extra;
+        try {
+            const { record, copied } = Edits.ensureEditable(custom, category, sub, modalTable.entries, isBuiltInTable(category, sub));
+            const result = op(record);
+            next = result.record || result;
+            extra = { ...result, copied };
+        } catch (err) {
+            ed.error.textContent = err.message;
+            return null;
+        }
+        if (!(await commitRecord(next))) { ed.error.textContent = 'Could not save in this browser.'; return null; }
+        // Entry numbers changed, so "no repeats" starts this table over
+        delete seen[keyOf(category, sub)];
+        save(SEEN_KEY, seen);
+        try { modalTable.entries = await source.entries(category, sub); } catch { modalTable.entries = []; }
+        editingIndex = null;
+        renderEditInfo();
+        renderEntries();
+        if (extra.copied) toast('Personal copy created. Only you see these changes');
+        return extra;
+    }
+
+    ed.add.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const { category, sub } = modalTable;
+        const done = await editTable((r) => Edits.addEntry(r, category, sub, ed.addText.value));
+        if (done) {
+            ed.addText.value = '';
+            ed.addText.focus();
+            els.modalList.lastElementChild?.scrollIntoView({ block: 'nearest' });
+        }
+    });
+    ed.addText.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ed.add.requestSubmit(); }
+    });
+
+    function renderEditableEntry(text, i, needle) {
+        const { category, sub } = modalTable;
+        if (editingIndex === i) {
+            const area = el('textarea', { class: 'be-input entry-edit-area', rows: Math.min(8, Math.max(2, Math.ceil(text.length / 70))), maxlength: Edits.MAX_ENTRY_LENGTH, 'aria-label': 'Edit entry ' + (i + 1) });
+            area.value = text;
+            setTimeout(() => { area.focus(); area.setSelectionRange(area.value.length, area.value.length); }, 0);
+            const saveEdit = () => editTable((r) => Edits.updateEntry(r, category, sub, i, area.value));
+            area.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveEdit(); }
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); editingIndex = null; renderEntries(); }
+            });
+            return el('li', { value: i + 1, class: 'is-editing' },
+                el('div', { class: 'entry-edit' },
+                    area,
+                    el('div', { class: 'entry-edit-actions' },
+                        el('button', { type: 'button', class: 'link-btn', onclick: () => { editingIndex = null; renderEntries(); } }, 'Cancel'),
+                        el('button', { type: 'button', class: 'btn-gold btn-sm-gold', onclick: saveEdit }, icon('check-lg'), el('span', { text: 'Save' })))));
+        }
+        return el('li', { value: i + 1 },
+            el('div', { class: 'entry-row' },
+                el('span', { class: 'entry-text is-static' }, highlight(text, needle)),
+                el('div', { class: 'entry-actions is-visible' },
+                    el('button', {
+                        type: 'button', class: 'icon-btn', title: 'Edit', 'aria-label': 'Edit entry ' + (i + 1),
+                        onclick: () => { editingIndex = i; renderEntries(); },
+                    }, icon('pencil')),
+                    el('button', {
+                        type: 'button', class: 'icon-btn', title: 'Delete', 'aria-label': 'Delete entry ' + (i + 1),
+                        onclick: async () => {
+                            const done = await editTable((r) => Edits.deleteEntry(r, category, sub, i));
+                            if (done) showUndo({ category, sub, index: i, text: done.removed });
+                        },
+                    }, icon('trash')))));
+    }
+
+    function showUndo(deleted) {
+        lastDeleted = deleted;
+        ed.undoText.textContent = 'Entry ' + (deleted.index + 1) + ' deleted.';
+        ed.undo.hidden = false;
+        clearTimeout(undoTimer);
+        undoTimer = setTimeout(hideUndo, 10000);
+    }
+    function hideUndo() {
+        ed.undo.hidden = true;
+        lastDeleted = null;
+        clearTimeout(undoTimer);
+    }
+    ed.undoBtn.addEventListener('click', async () => {
+        if (!lastDeleted || !modalTable || lastDeleted.category !== modalTable.category || lastDeleted.sub !== modalTable.sub) return;
+        const { category, sub, index, text } = lastDeleted;
+        hideUndo();
+        await editTable((r) => Edits.restoreEntry(r, category, sub, index, text));
+    });
+
+    async function resetToOriginal() {
+        const { category, sub } = modalTable;
+        if (!window.confirm('Reset “' + sub + '” to the original? Your changes to this table will be lost.')) return;
+        await editTable((r) => Edits.resetTable(r, category, sub));
+        toast('“' + sub + '” is back to the original');
+    }
+
+    async function deleteThisTable() {
+        const { category, sub } = modalTable;
+        if (!window.confirm('Delete your table “' + sub + '” and all its entries? This can’t be undone.')) return;
+        const next = Edits.deleteTable(custom, category, sub);
+        if (!(await commitRecord(next))) { ed.error.textContent = 'Could not save in this browser.'; return; }
+        delete seen[keyOf(category, sub)];
+        save(SEEN_KEY, seen);
+        modal.hide();
+        toast('Deleted “' + sub + '”');
+    }
+
+    modalEl.addEventListener('hidden.bs.modal', () => { if (modalEdit) setEditMode(false); });
     modalEl.addEventListener('shown.bs.modal', () => {
         if (window.matchMedia('(pointer: fine)').matches) els.modalFilter.focus();
     });
@@ -2099,6 +2333,7 @@ import * as Init from './initiative.js';
             else showMessages('error', 'That file couldn’t be read.', [err.message]);
             return;
         }
+        if (custom && !window.confirm('Loading this file replaces your current tables, including any edits and personal copies. Export them first if you want to keep them. Continue?')) return;
         // Keep icon choices for categories that are still in the new file
         const icons = Object.fromEntries(Object.entries(custom?.icons || {}).filter(([cat]) => cat in parsed.data));
         openPicker = null;

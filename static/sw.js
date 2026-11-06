@@ -12,7 +12,7 @@ const TIMEOUT = 2500;
 const SHELL = [
     '/', '/cards',
     '/styles/style.css',
-    '/scripts/theme.js', '/scripts/app.js', '/scripts/data.js', '/scripts/dice.js', '/scripts/initiative.js',
+    '/scripts/theme.js', '/scripts/app.js', '/scripts/data.js', '/scripts/dice.js', '/scripts/initiative.js', '/scripts/edits.js',
     '/images/favicon.svg', '/images/favicon.ico',
 ];
 

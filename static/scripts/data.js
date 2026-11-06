@@ -246,8 +246,10 @@ export function parseCustomJson(text) {
 }
 
 // Defaults plus custom: new categories/tables are added, and entries for an
-// existing table are appended (exact duplicates skipped).
-export function mergeData(base, custom) {
+// existing table are appended (exact duplicates skipped). Tables listed in
+// `overrides` ("category|table") are personal copies and replace the built-in table.
+export function mergeData(base, custom, overrides = []) {
+    const replaced = new Set(overrides);
     const out = {};
     for (const [cat, subs] of Object.entries(base)) {
         out[cat] = {};
@@ -257,7 +259,7 @@ export function mergeData(base, custom) {
         out[cat] = out[cat] || {};
         for (const [sub, entries] of Object.entries(subs)) {
             const existing = out[cat][sub];
-            if (!existing) { out[cat][sub] = entries.slice(); continue; }
+            if (!existing || replaced.has(cat + '|' + sub)) { out[cat][sub] = entries.slice(); continue; }
             const seen = new Set(existing);
             for (const e of entries) if (!seen.has(e)) { existing.push(e); seen.add(e); }
         }
@@ -352,6 +354,8 @@ export function iconFor(category, custom, serverStructure) {
     return serverStructure.find((c) => c.name === category)?.icon || DEFAULT_CUSTOM_ICON;
 }
 
+let baseData = null; // the built-in tables, cached once loaded (merge mode)
+
 // Pick the source for the stored custom data (or the server if there is none).
 export async function createSource(custom, serverStructure) {
     if (!custom) return new ServerSource(serverStructure);
@@ -360,8 +364,8 @@ export async function createSource(custom, serverStructure) {
         meta[cat] = { ...meta[cat], icon: iconFor(cat, custom, serverStructure) };
     }
     if (custom.mode === 'replace') return new LocalSource(custom.data, meta);
-    const base = await api(['getall']);
-    return new LocalSource(mergeData(base, custom.data), meta);
+    baseData = baseData || await api(['getall']); // fetched once per page, reused after edits
+    return new LocalSource(mergeData(baseData, custom.data, custom.overrides || []), meta);
 }
 
 // ---------- Share links ----------

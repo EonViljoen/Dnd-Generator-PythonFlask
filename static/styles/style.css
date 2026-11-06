@@ -2391,3 +2391,110 @@ select.be-input { appearance: auto; }
     .content-head-tools .btn-outline-gold { flex: 1; }
     .roll-count { flex: none; }
 }
+
+/* =========================================================
+   Editing tables
+   ========================================================= */
+.entries-edit-toggle { margin-right: 0.5rem; }
+.entries-edit-toggle[aria-pressed="true"] { background: var(--gold); border-color: var(--gold); color: var(--on-accent); }
+.entries-edit-toggle[aria-pressed="true"] .bi { color: var(--on-accent); }
+
+.edit-panel { padding: 0 1rem 0.5rem; }
+.edit-panel[hidden] { display: none; }
+.edit-info {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    margin-bottom: 0.75rem;
+}
+.edit-info.is-builtin { border-color: color-mix(in srgb, #6cb8e0 55%, transparent); background: color-mix(in srgb, #6cb8e0 10%, var(--surface)); }
+.edit-info.is-copy { border-color: var(--gold-line); background: var(--gold-soft); }
+.edit-info-icon { font-size: 1.2rem; line-height: 1.2; color: var(--gold); flex: none; }
+.edit-info.is-builtin .edit-info-icon { color: #6cb8e0; }
+.edit-info-body { min-width: 0; font-size: 0.85rem; }
+.edit-info-body strong { display: block; font-size: 0.92rem; margin-bottom: 0.2rem; }
+.edit-info-body p { margin: 0 0 0.35rem; color: var(--muted); line-height: 1.45; }
+.edit-info-body p:last-child { margin-bottom: 0; }
+.edit-info-actions { margin-top: 0.5rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.edit-add { display: flex; gap: 0.5rem; align-items: flex-start; }
+.edit-add textarea { flex: 1; resize: vertical; min-height: 2.6rem; font-family: var(--font-prose); font-size: 1rem; }
+.edit-add .btn-gold { height: 2.6rem; }
+.edit-panel .dice-error { margin-top: 0.35rem; }
+.edit-undo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 8px;
+    background: var(--surface-3);
+    font-size: 0.85rem;
+}
+.edit-undo[hidden] { display: none; }
+.edit-undo .link-btn { margin: 0; color: var(--gold); font-weight: 600; }
+
+.entry-text.is-static { cursor: default; }
+.entry-text.is-static:hover { color: var(--text); }
+.entry-actions.is-visible { opacity: 1; }
+.entries-list li.is-editing { padding: 0.4rem 0; }
+.entry-edit { display: flex; flex-direction: column; gap: 0.4rem; }
+.entry-edit-area { font-family: var(--font-prose); font-size: 1.02rem; line-height: 1.45; resize: vertical; }
+.entry-edit-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; }
+.entry-edit-actions .link-btn { margin: 0; }
+
+/* Tiles: badges and "+ New table" */
+.tile-badge {
+    display: inline-block;
+    margin-left: 0.4rem;
+    vertical-align: 0.1em;
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--gold);
+    border: 1px solid var(--gold-line);
+    border-radius: 999px;
+    padding: 0.05rem 0.4rem;
+}
+.tile-badge.is-own { color: var(--muted); border-color: var(--border-strong); }
+.tile-new {
+    min-height: 92px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 0.9rem;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.tile-new:hover { border-color: var(--gold); color: var(--gold); background: var(--gold-soft); }
+.tile-new-form {
+    grid-column: span 2;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--gold);
+    border-radius: var(--radius);
+}
+.tile-new-head { display: flex; align-items: center; gap: 0.4rem; color: var(--gold); }
+.tile-new-head strong { color: var(--text); font-family: var(--font-display); }
+.tile-new-form textarea { resize: vertical; }
+.tile-new-form .dice-error { margin: 0; }
+.tile-new-actions { display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; }
+.tile-new-actions .link-btn { margin: 0; }
+
+@media (max-width: 899.98px) {
+    .tile-new-form { grid-column: 1 / -1; }
+    .entries-edit-toggle span { display: none; }
+    .edit-add { flex-direction: column; align-items: stretch; }
+}
