@@ -9,7 +9,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 
 [**Open the live app →**](https://dnd-generator-pythonflask.onrender.com/)
 
-![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-000000?logo=flask&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES%20modules-F7DF1E?logo=javascript&logoColor=black)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white)
@@ -118,7 +118,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 
 | Tool | Used for |
 |------|----------|
-| [Python 3](https://www.python.org/) | Language (3.9+) |
+| [Python 3.11](https://www.python.org/) | Language (pinned in [`.python-version`](.python-version), which Render follows) |
 | [Flask 3](https://flask.palletsprojects.com/) | Web framework, routing and blueprints |
 | [Flask-RESTful](https://flask-restful.readthedocs.io/) | JSON API resources under `/api` |
 | [Jinja2](https://jinja.palletsprojects.com/) | Server-rendered templates (shared `base.html`, homepage stats and cards) |
@@ -147,12 +147,12 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 
 ## Getting started
 
-**Requirements:** [Python 3.9+](https://www.python.org/downloads/)
+**Requirements:** [Python 3.11](https://www.python.org/downloads/) (newer works too; macOS: `brew install python@3.11`)
 
 ```bash
 git clone https://github.com/EonViljoen/Dnd-Generator-PythonFlask.git
 cd Dnd-Generator-PythonFlask
-python3 -m venv venv
+python3.11 -m venv venv
 ```
 
 Activate the virtual environment and install dependencies:
@@ -198,7 +198,7 @@ Every push runs the automated checks on GitHub ([`.github/workflows/checks.yml`]
 
 | Check | What it covers |
 |-------|----------------|
-| **Python** (3.10 and 3.13) | Clean install and `pip check`; every page and API route, including 404s for bad names; data checks on `rpg_generator.json` (no empty entries, no `?` encoding glitches, no split entries, valid names, Quick builds point at real tables); the app starting under Gunicorn and passing `/api/health` |
+| **Python** (3.11 and 3.13) | Clean install and `pip check`; every page and API route, including 404s for bad names; data checks on `rpg_generator.json` (no empty entries, no `?` encoding glitches, no split entries, valid names, Quick builds point at real tables); the app starting under Gunicorn and passing `/api/health` |
 | **JavaScript** | Syntax check of every script; unit tests for the dice engine, initiative tracker and table editing |
 
 Run them locally:

@@ -12,8 +12,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Oldest and a current release available on GitHub's Ubuntu runners (3.9 is end-of-life)
-        python-version: ['3.10', '3.13']
+        # 3.11 is what Render runs (pinned in .python-version); 3.13 catches upcoming breakage
+        python-version: ['3.11', '3.13']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

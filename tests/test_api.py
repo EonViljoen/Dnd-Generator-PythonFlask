@@ -14,7 +14,8 @@ def test_pages_render(client, path):
     '/favicon.ico', '/sw.js', '/styles/style.css', '/scripts/app.js', '/scripts/theme.js', '/images/favicon.svg',
 ])
 def test_static_files(client, path):
-    assert client.get(path).status_code == 200
+    with client.get(path) as res:  # close the file response
+        assert res.status_code == 200
 
 
 def test_health(client, data):
