@@ -842,6 +842,7 @@ import * as Backup from './backup.js';
     let charList = null;    // the list container while the Characters view is shown
     let partyBody = null;   // the content container while the Party view is shown
     let partyForm = null;   // 'new' | 'rename' while the inline name form is open
+    const expandedRows = new Set();   // party rows showing slots, hit dice and rests
     let currentPartyId = (() => { try { return localStorage.getItem(CURRENT_PARTY_KEY); } catch { return null; } })();
 
     const currentParty = () => parties.find((p) => p.id === currentPartyId) || parties[0] || null;
@@ -874,6 +875,7 @@ import * as Backup from './backup.js';
         toast(c.name + ' is now level ' + next.level + (profUp ? ' (proficiency ' + Party.signed(Party.proficiency(next.level)) + ')' : ''));
     }
 
+    const ordinal = (n) => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
     const statBox = (label, value, title) => el('div', { class: 'party-stat', title },
         el('span', { class: 'party-stat-label', text: label }), el('strong', { text: value }));
 
@@ -908,6 +910,114 @@ import * as Backup from './backup.js';
         onclick: () => levelUpCharacter(c),
     }, icon('arrow-up-circle'), small ? null : ' Level up');
 
+    // ----- Tracking during play (step 2) -----
+    const isDown = (c) => c.maxHp !== null && c.hp === 0;
+    function downBadge(c) {
+        if (!isDown(c)) return null;
+        const state = Party.deathState(c);
+        return el('span', { class: 'init-down' + (state === 'stable' ? ' is-stable' : ''), text: state === 'dead' ? 'Dead' : state === 'stable' ? 'Stable' : 'Down' });
+    }
+
+    // Row of boxes: `filled` of `total` are on; clicking box n calls onPick(n)
+    function pips(total, filled, { label, cls = '', onPick, filledLabel = 'used' }) {
+        return el('span', { class: 'pt-pips ' + cls, role: 'group', 'aria-label': label },
+            ...Array.from({ length: total }, (_, i) => el('button', {
+                type: 'button', class: 'pt-pip' + (i < filled ? ' is-on' : ''),
+                'aria-pressed': String(i < filled), 'aria-label': label + ' ' + (i + 1) + (i < filled ? ' (' + filledLabel + ')' : ''),
+                onclick: () => onPick(i + 1),
+            })));
+    }
+
+    // Inspiration, conditions and exhaustion: shown on every card and party row
+    function statusLine(c) {
+        const condSelect = el('select', {
+            class: 'init-cond-add', 'aria-label': 'Add a condition to ' + c.name,
+            onchange: (e) => {
+                const v = e.currentTarget.value;
+                if (v === '__exhaustion') updateCharacter(Party.setExhaustion(c, 1));
+                else if (v) updateCharacter(Party.toggleCondition(c, v));
+            },
+        }, el('option', { value: '', text: '+ Condition' }),
+            ...Party.CONDITIONS.filter((x) => !c.conditions.includes(x)).map((x) => el('option', { value: x, text: x })),
+            c.exhaustion ? null : el('option', { value: '__exhaustion', text: 'Exhaustion' }));
+        return el('div', { class: 'init-conds pt-status' },
+            el('button', {
+                type: 'button', class: 'pt-insp' + (c.inspiration ? ' is-on' : ''), 'aria-pressed': String(c.inspiration),
+                title: c.inspiration ? 'Has Inspiration (click to use it)' : 'Give Inspiration',
+                onclick: () => updateCharacter(Party.toggleInspiration(c)),
+            }, icon(c.inspiration ? 'star-fill' : 'star'), el('span', { class: 'visually-hidden', text: 'Inspiration' })),
+            ...c.conditions.map((x) => el('button', {
+                type: 'button', class: 'init-cond', title: 'Remove ' + x, 'aria-label': 'Remove ' + x + ' from ' + c.name,
+                onclick: () => updateCharacter(Party.toggleCondition(c, x)),
+            }, x, icon('x'))),
+            c.exhaustion ? el('span', { class: 'init-cond pt-exh' },
+                el('button', { type: 'button', class: 'pt-exh-btn', 'aria-label': 'Less exhaustion', onclick: () => updateCharacter(Party.setExhaustion(c, c.exhaustion - 1)) }, icon('dash')),
+                'Exhaustion ' + c.exhaustion,
+                el('button', { type: 'button', class: 'pt-exh-btn', 'aria-label': 'More exhaustion', disabled: c.exhaustion >= Party.MAX_EXHAUSTION, onclick: () => updateCharacter(Party.setExhaustion(c, c.exhaustion + 1)) }, icon('plus'))) : null,
+            condSelect);
+    }
+
+    function deathSaves(c) {
+        if (!isDown(c)) return null;
+        const pick = (kind) => (n) => updateCharacter(Party.setDeathSave(c, kind, n));
+        return el('div', { class: 'pt-death' },
+            el('span', { class: 'pt-track-label', text: 'Death saves' }),
+            el('span', { class: 'pt-death-set' }, 'Successes ', pips(3, c.deathSaves.success, { label: 'Death save success', cls: 'is-good', onPick: pick('success'), filledLabel: 'ticked' })),
+            el('span', { class: 'pt-death-set' }, 'Failures ', pips(3, c.deathSaves.fail, { label: 'Death save failure', cls: 'is-bad', onPick: pick('fail'), filledLabel: 'ticked' })));
+    }
+
+    // Spell slots, hit dice and rests
+    function resources(c) {
+        const slotRows = c.slots.flatMap((s, i) => (s.max ? [el('div', { class: 'pt-slot' },
+            el('span', { class: 'pt-slot-level', text: ordinal(i + 1) }),
+            pips(s.max, s.max - s.used, {
+                label: ordinal(i + 1) + '-level slot', cls: 'is-slot', filledLabel: 'available',
+                // Boxes show what's left: click a lit box to spend down to it, the first dim one to get one back
+                onPick: (n) => updateCharacter(Party.setSlotsUsed(c, i + 1, n <= s.max - s.used ? s.max - n + 1 : s.max - n)),
+            }),
+            el('span', { class: 'pt-slot-count', text: (s.max - s.used) + '/' + s.max }))] : []));
+        const restBox = el('div', { class: 'pt-rest' });
+        const left = Party.hitDiceLeft(c);
+        const die = Party.hitDieOf(c);
+        const showButtons = () => fill(restBox,
+            el('span', { class: 'pt-hd', title: 'Hit dice left (one per level)' }, 'Hit dice ', el('strong', { text: left + '/' + c.level }), ' d' + die),
+            el('span', { class: 'pt-rest-btns' },
+                el('button', { type: 'button', class: 'btn-outline-gold btn-sm-gold', onclick: showShortRest }, icon('cup-hot'), ' Short rest'),
+                el('button', {
+                    type: 'button', class: 'btn-outline-gold btn-sm-gold',
+                    onclick: () => {
+                        if (!window.confirm('Long rest for ' + c.name + '? HP and spell slots come back, plus half their hit dice, and one level of exhaustion goes.')) return;
+                        updateCharacter(Party.longRest(c));
+                        toast(c.name + ' finished a long rest');
+                    },
+                }, icon('moon-stars'), ' Long rest')));
+        function showShortRest() {
+            const count = el('input', { type: 'number', inputmode: 'numeric', class: 'init-hp-amount', min: 0, max: left, value: Math.min(1, left), 'aria-label': 'Hit dice to spend' });
+            fill(restBox, el('form', {
+                class: 'pt-short-rest',
+                onsubmit: (e) => {
+                    e.preventDefault();
+                    const n = Math.min(left, Math.max(0, Math.trunc(Number(count.value) || 0)));
+                    const rolls = Array.from({ length: n }, () => Dice.rollDie(die));
+                    const r = Party.shortRest(c, rolls);
+                    updateCharacter(r.character);
+                    const con = Party.modifier(c.scores.con);
+                    toast(c.name + ' rested' + (n ? ': rolled ' + rolls.join(', ') + (con ? ' (' + Party.signed(con) + ' CON each)' : '') + ', healed ' + r.healed : '') + (c.pactMagic && Party.hasSlots(c) ? ', slots back' : ''));
+                },
+            },
+                el('span', {}, left ? 'Spend' : 'No hit dice left.'),
+                left ? count : null,
+                left ? el('span', { text: 'of ' + left + ' × d' + die }) : null,
+                el('button', { type: 'submit', class: 'btn-gold btn-sm-gold' }, icon('dice-5'), left ? ' Roll and rest' : ' Rest'),
+                el('button', { type: 'button', class: 'link-btn', onclick: showButtons }, 'Cancel')));
+            if (left) count.select();
+        }
+        showButtons();
+        return el('div', { class: 'pt-resources' },
+            slotRows.length ? el('div', { class: 'pt-slots' }, el('span', { class: 'pt-track-label', text: 'Spell slots' + (c.pactMagic ? ' (Pact Magic)' : '') }), ...slotRows) : null,
+            restBox);
+    }
+
     // ----- Characters view -----
     function renderCharacters() {
         charList = el('section', { class: 'party-list-wrap', 'aria-label': 'Characters' });
@@ -936,13 +1046,14 @@ import * as Backup from './backup.js';
 
     function renderCharacterCard(c) {
         const inParties = parties.filter((p) => p.members.some((m) => m.id === c.id)).map((p) => p.name);
-        return el('li', { class: 'party-card' + (c.maxHp !== null && c.hp === 0 ? ' is-down' : '') },
+        return el('li', { class: 'party-card' + (isDown(c) ? ' is-down' : '') },
             el('div', { class: 'party-card-head' },
                 el('div', { class: 'party-name-wrap' },
                     el('h2', { class: 'party-name', text: c.name }),
                     el('p', { class: 'party-summary', text: Party.summary(c) }),
                     c.player ? el('p', { class: 'party-player', text: 'Played by ' + c.player }) : null),
-                c.maxHp !== null && c.hp === 0 ? el('span', { class: 'init-down', text: 'Down' }) : null),
+                downBadge(c)),
+            statusLine(c),
             el('div', { class: 'party-stats' },
                 statBox('AC', c.ac ?? '—', 'Armor Class'),
                 statBox('Init', Party.signed(Party.initiativeBonus(c)), 'Initiative bonus (Dexterity)'),
@@ -950,6 +1061,8 @@ import * as Backup from './backup.js';
                 statBox('Speed', c.speed + ' ft', 'Speed'),
                 statBox('Prof', Party.signed(Party.proficiency(c.level)), 'Proficiency bonus')),
             hpTracker(c),
+            deathSaves(c),
+            resources(c),
             inParties.length ? el('p', { class: 'party-in' }, icon('people'), ' ' + inParties.join(', ')) : null,
             el('div', { class: 'party-actions' },
                 levelUpButton(c),
@@ -1060,6 +1173,17 @@ import * as Backup from './backup.js';
             },
         }, icon('arrow-up-circle'), ' Level up the party') : null;
 
+        const restAll = active.length ? el('button', {
+            type: 'button', class: 'btn-outline-gold btn-sm-gold', title: 'Long rest for everyone playing',
+            onclick: () => {
+                if (!window.confirm('Long rest for ' + active.map((c) => c.name).join(', ') + '? HP and spell slots come back, plus half their hit dice, and one level of exhaustion goes.')) return;
+                let next = characters;
+                for (const c of active) next = Party.upsert(next, Party.longRest(c));
+                saveCharacters(next);
+                toast('The party finished a long rest');
+            },
+        }, icon('moon-stars'), ' Long rest') : null;
+
         const avg = active.length ? Math.round(active.reduce((n, c) => n + c.level, 0) / active.length) : 0;
         fill(partyBody,
             partyForm === 'rename' ? partyNameForm('rename') : bar,
@@ -1067,7 +1191,7 @@ import * as Backup from './backup.js';
                 el('span', { class: 'cz-vis-count', text: members.length
                     ? active.length + ' playing' + (away.length ? ' · ' + away.length + ' away' : '') + (active.length ? ' · average level ' + avg : '')
                     : 'No one in this party yet.' }),
-                levelAll),
+                active.length ? el('span', { class: 'pt-summary-btns' }, restAll, levelAll) : null),
             members.length ? el('ul', { class: 'pt-list' }, ...active.map((c) => renderPartyRow(p, c))) : null,
             away.length ? el('h2', { class: 'section-label pt-away-label', text: 'Not playing this session' }) : null,
             away.length ? el('ul', { class: 'pt-list is-away' }, ...away.map((c) => renderPartyRow(p, c))) : null,
@@ -1081,26 +1205,36 @@ import * as Backup from './backup.js';
             onchange: (e) => saveParties(Party.setActive(parties, p.id, c.id, e.currentTarget.checked)),
         });
         toggle.checked = c.active;
-        const down = c.maxHp !== null && c.hp === 0;
+        const down = isDown(c);
+        const open = expandedRows.has(c.id);
+        const extra = c.active && (open || down) ? el('div', { class: 'pt-extra' }, deathSaves(c), open ? resources(c) : null) : null;
         return el('li', { class: 'pt-row' + (c.active ? '' : ' is-away') + (down ? ' is-down' : '') },
             el('label', { class: 'pt-switch' }, toggle, c.active ? 'Playing' : 'Away'),
             el('div', { class: 'pt-who' },
                 el('div', { class: 'pt-name-line' },
                     el('span', { class: 'pt-name', text: c.name }),
-                    down ? el('span', { class: 'init-down', text: 'Down' }) : null),
+                    downBadge(c)),
                 el('span', { class: 'pt-meta', text: [Party.summary(c), c.player].filter(Boolean).join(' · ') })),
+            c.active ? statusLine(c) : null,
             el('div', { class: 'pt-stats' },
                 statBox('AC', c.ac ?? '—', 'Armor Class'),
                 statBox('Init', Party.signed(Party.initiativeBonus(c)), 'Initiative bonus'),
                 statBox('Perc', Party.passivePerception(c), 'Passive Perception')),
             c.active ? hpTracker(c) : el('span', { class: 'pt-hp-away' }, c.maxHp === null ? '' : 'HP ' + c.hp + ' / ' + c.maxHp),
             el('div', { class: 'pt-tools' },
+                c.active ? el('button', {
+                    type: 'button', class: 'icon-btn pt-icon', 'aria-expanded': String(open),
+                    title: open ? 'Hide slots and rests' : 'Spell slots, hit dice and rests',
+                    'aria-label': (open ? 'Hide' : 'Show') + ' spell slots, hit dice and rests for ' + c.name,
+                    onclick: () => { if (open) expandedRows.delete(c.id); else expandedRows.add(c.id); renderPartyBody(); },
+                }, icon(open ? 'chevron-up' : 'chevron-down')) : null,
                 levelUpButton(c, true),
                 el('button', { type: 'button', class: 'icon-btn pt-icon', title: 'Open sheet', 'aria-label': 'Open ' + c.name + '’s sheet', onclick: () => openSheet(c.id) }, icon('journal-text')),
                 el('button', {
                     type: 'button', class: 'icon-btn pt-icon', title: 'Remove from ' + p.name, 'aria-label': 'Remove ' + c.name + ' from ' + p.name,
                     onclick: () => { saveParties(Party.removeMember(parties, p.id, c.id)); toast(c.name + ' left ' + p.name); },
-                }, icon('x-lg'))));
+                }, icon('x-lg'))),
+            extra);
     }
 
     // ----- Character sheet -----
@@ -1149,6 +1283,12 @@ import * as Backup from './backup.js';
         shield.checked = c.shield;
         const percProf = el('input', { type: 'checkbox', name: 'perceptionProf' });
         percProf.checked = c.perceptionProf;
+        const hitDieSelect = el('select', { class: 'be-input', name: 'hitDie' },
+            el('option', { value: '', 'data-auto': '1' }),
+            ...Party.HIT_DICE.map((d) => el('option', { value: d, text: 'd' + d })));
+        hitDieSelect.value = c.hitDie ? String(c.hitDie) : '';
+        const pact = el('input', { type: 'checkbox', name: 'pactMagic' });
+        pact.checked = c.pactMagic;
         const derived = (key, label) => el('div', { class: 'party-stat' }, el('span', { class: 'party-stat-label', text: label }), el('strong', { 'data-derived': key }));
 
         return [
@@ -1173,6 +1313,14 @@ import * as Backup from './backup.js';
                     field('Speed (ft)', numIn('speed', c.speed, { min: 0, max: Party.LIMITS.maxSpeed, step: 5 }))),
                 el('div', { class: 'party-stats ps-derived' },
                     derived('prof', 'Proficiency'), derived('init', 'Initiative'), derived('perc', 'Passive Perception'))),
+            section('magic', 'Hit dice and spell slots',
+                el('div', { class: 'ps-grid' },
+                    field('Hit die', hitDieSelect),
+                    el('p', { class: 'cz-sub ps-hint', 'data-derived': 'hitdice' })),
+                el('p', { class: 'cz-sub ps-slots-hint', text: 'Spell slots per spell level. Leave at 0 for characters without spells.' }),
+                el('div', { class: 'ps-slots' }, ...c.slots.map((sl, i) =>
+                    field(ordinal(i + 1), numIn('slot-' + (i + 1), sl.max || '', { min: 0, max: Party.LIMITS.maxSlots, placeholder: '0' })))),
+                el('label', { class: 'ps-check' }, pact, ' Pact Magic (slots come back on a short rest)')),
             section('bar-chart', 'Ability scores',
                 el('div', { class: 'ps-scores' }, ...scores),
                 el('label', { class: 'ps-check' }, percProf, ' Proficient in Perception')),
@@ -1234,7 +1382,10 @@ import * as Backup from './backup.js';
             Object.fromEntries([...row.querySelectorAll('[data-key]')].map((i) => [i.dataset.key, i.value])));
         const existing = characters.find((x) => x.id === sheetId);
         return {
+            ...(existing || {}),   // keeps what's tracked during play (conditions, slots used, ...)
             id: sheetId || undefined, createdAt: existing?.createdAt,
+            hitDie: v('hitDie'), pactMagic: f.pactMagic.checked,
+            slots: Array.from({ length: Party.SPELL_LEVELS }, (_, i) => ({ max: v('slot-' + (i + 1)), used: existing?.slots[i]?.used ?? 0 })),
             name: v('name'), player: v('player'), race: v('race'), cls: v('cls'), subclass: v('subclass'),
             level: v('level'), background: v('background'), alignment: v('alignment'),
             maxHp: v('maxHp'), hp: v('hp') === '' ? v('maxHp') : v('hp'), tempHp: v('tempHp'), ac: v('ac'), speed: v('speed'),
@@ -1254,6 +1405,9 @@ import * as Backup from './backup.js';
         set('prof', Party.signed(Party.proficiency(c.level)));
         set('init', Party.signed(Party.initiativeBonus(c)));
         set('perc', Party.passivePerception(c));
+        const auto = sheet.body.querySelector('[data-auto]');
+        if (auto) auto.textContent = 'd' + Party.hitDieFor(c.cls) + ' (' + (c.cls || 'usual') + ')';
+        set('hitdice', c.level + ' hit dice (d' + Party.hitDieOf(c) + '), one per level. Spend them on a short rest.');
     }
     sheet.form.addEventListener('input', updateDerived);
 
