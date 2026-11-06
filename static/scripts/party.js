@@ -307,3 +307,45 @@ export function normalizeParties(raw, characterIds = null) {
     }
     return out;
 }
+
+// ---------- Sharing one character ----------
+// As a link (#share=...) or a file. The copy gets a new id when it's added, and what's tracked
+// during play (HP, slots used, conditions, ...) comes along as it was.
+export const CHARACTER_FILE_KIND = 'dnd-prompt-helper-character';
+
+export function portable(c) {
+    const { id, createdAt, updatedAt, ...rest } = c;
+    return rest;
+}
+
+export const characterFile = (c, now = new Date()) =>
+    ({ kind: CHARACTER_FILE_KIND, version: 1, exportedAt: now.toISOString(), character: portable(c) });
+
+export function characterFilename(c) {
+    const slug = c.name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+    return (slug || 'character') + '.json';
+}
+
+// A character file → character fields (no id yet), or throws with a readable message
+export function parseCharacterFile(text) {
+    let raw;
+    try { raw = JSON.parse(text); } catch { throw new Error('This file isn’t valid JSON.'); }
+    if (raw?.kind === 'dnd-prompt-helper-backup') throw new Error('That’s a full backup. Restore it in Customize › Backup.');
+    if (!isPlainObject(raw) || raw.kind !== CHARACTER_FILE_KIND) throw new Error('This isn’t a character file from D&D Prompt Helper.');
+    if (!Number.isInteger(raw.version) || raw.version > 1) throw new Error('This character was saved by a newer version of the app. Reload the page and try again.');
+    const c = normalizeCharacter({ ...raw.character, id: 'import' });
+    if (!c) throw new Error('This character file is missing a name.');
+    return portable(c);
+}
+
+// A copy for "Duplicate", or for adding a shared/imported character
+export function copyOf(fields, existingNames = [], now = new Date().toISOString()) {
+    let name = fields.name;
+    if (existingNames.some((n) => sameName(n, name))) {
+        const base = name.replace(/ \(\d+\)$/, '');
+        let i = 2;
+        while (existingNames.some((n) => sameName(n, base + ' (' + i + ')'))) i += 1;
+        name = (base + ' (' + i + ')').slice(0, LIMITS.maxText);
+    }
+    return createCharacter({ ...fields, id: undefined, createdAt: undefined, name }, now);
+}

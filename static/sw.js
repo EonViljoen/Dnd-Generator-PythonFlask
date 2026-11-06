@@ -7,7 +7,7 @@
 //   use the saved copy. Successful responses refresh the saved copy, so a deploy shows up
 //   on the next visit while the server is awake.
 
-const CACHE = 'dnd-shell-v5'; // bump when the list of saved files changes
+const CACHE = 'dnd-shell-v6'; // bump when the list of saved files changes
 const TIMEOUT = 2500;
 const SHELL = [
     '/', '/cards',

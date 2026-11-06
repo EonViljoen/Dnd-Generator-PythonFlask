@@ -5,6 +5,7 @@ import {
     createCharacter, normalizeCharacter, normalizeParty, levelUp, changeHp, upsert, remove,
     createParty, renameParty, deleteParty, addMember, removeMember, setActive, removeCharacterEverywhere, roster, normalizeParties,
     toggleCondition, setExhaustion, toggleInspiration, setDeathSave, deathState, setSlotsUsed, shortRest, longRest,
+    characterFile, parseCharacterFile, characterFilename, copyOf, portable,
     hitDieFor, hitDieOf, hitDiceLeft, hasSlots,
     modifier, proficiency, passivePerception, initiativeBonus, summary, signed, LIMITS,
 } from '../static/scripts/party.js';
@@ -222,4 +223,29 @@ test('long rest restores HP, slots, half the hit dice and one exhaustion level',
     assert.equal(r.exhaustion, 1);
     assert.deepEqual(r.deathSaves, { success: 0, fail: 0 });
     assert.equal(longRest(createCharacter({ name: 'Y', level: 1, hitDiceUsed: 1 })).hitDiceUsed, 0, 'at least one die back');
+});
+
+test('character files round-trip and refuse other files', () => {
+    const c = createCharacter({ name: 'Aria Stormwind', level: 3, maxHp: 20, hp: 7, conditions: ['Prone'], slots: [{ max: 2, used: 1 }] });
+    const file = characterFile(c, new Date('2026-11-06T00:00:00Z'));
+    assert.equal(file.character.id, undefined);
+    const back = parseCharacterFile(JSON.stringify(file));
+    assert.deepEqual(back, portable(c));
+    assert.equal(characterFilename(c), 'aria-stormwind.json');
+    assert.equal(characterFilename({ name: '???' }), 'character.json');
+    assert.throws(() => parseCharacterFile('nope'), /valid JSON/);
+    assert.throws(() => parseCharacterFile(JSON.stringify({ kind: 'dnd-prompt-helper-backup' })), /full backup/);
+    assert.throws(() => parseCharacterFile(JSON.stringify({ Town: {} })), /isn’t a character file/);
+    assert.throws(() => parseCharacterFile(JSON.stringify({ ...file, version: 2 })), /newer version/);
+    assert.throws(() => parseCharacterFile(JSON.stringify({ ...file, character: { level: 2 } })), /missing a name/);
+});
+
+test('copies get a new id and a free name', () => {
+    const c = createCharacter({ name: 'Aria', level: 4 });
+    const copy = copyOf(c, ['Aria', 'aria (2)']);
+    assert.notEqual(copy.id, c.id);
+    assert.equal(copy.name, 'Aria (3)');
+    assert.equal(copy.level, 4);
+    assert.equal(copyOf(c, ['Bram']).name, 'Aria');
+    assert.equal(copyOf({ ...c, name: 'Aria (3)' }, ['Aria (3)']).name, 'Aria (2)');
 });

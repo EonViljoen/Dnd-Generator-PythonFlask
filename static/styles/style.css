@@ -2840,3 +2840,15 @@ select.be-input { appearance: auto; }
     .pt-row > .pt-extra { grid-column: 2 / 4; }
 }
 .ps-derived .party-stat-label { white-space: normal; text-align: center; line-height: 1.2; }
+
+/* Initiative: players linked to a saved character */
+.init-linked { background: none; border: 0; padding: 0 0.1rem; color: var(--gold); font-size: 0.95rem; line-height: 1; }
+.init-linked:hover { color: var(--gold-hover); }
+.init-main .pt-death { margin-top: 0.1rem; }
+.init-add-party { margin-left: auto; margin-right: 0.5rem; max-width: 12rem; }
+.pt-head-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.pt-head-btns label { cursor: pointer; margin: 0; }
+.pt-head-btns label:focus-within { outline: 2px solid var(--gold); outline-offset: 2px; }
+.ps-tools { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border); }
+.ps-tools .link-btn { display: inline-flex; align-items: center; gap: 0.3rem; }
+.share-stats { margin-top: 0.75rem; }

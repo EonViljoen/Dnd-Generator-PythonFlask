@@ -720,6 +720,15 @@ import * as Backup from './backup.js';
         },
             el('div', { class: 'init-form-head' },
                 el('h2', { class: 'dice-card-title', text: 'Add to combat' }),
+                parties.some((p) => p.members.some((m) => m.active)) ? el('select', {
+                    class: 'init-cond-add init-add-party', 'aria-label': 'Add a party',
+                    onchange: (e) => {
+                        const p = parties.find((x) => x.id === e.currentTarget.value);
+                        e.currentTarget.value = '';
+                        if (p) sendToInitiative(Party.roster(p, characters).filter((c) => c.active), { open: false });
+                    },
+                }, el('option', { value: '', text: '+ Add a party' }),
+                    ...parties.filter((p) => p.members.some((m) => m.active)).map((p) => el('option', { value: p.id, text: p.name }))) : null,
                 el('div', { class: 'dice-mode-row', role: 'group', 'aria-label': 'Type' }, ...kindButtons)),
             el('div', { class: 'init-form-fields' },
                 field('Name', name, 'init-name-field'),
@@ -746,6 +755,19 @@ import * as Backup from './backup.js';
             el('ol', { class: 'init-list' }, ...order.map(renderInitRow)),
             el('div', { class: 'init-list-actions' },
                 el('span', { class: 'init-hint' }, 'Press ', el('kbd', { text: 'N' }), ' for the next turn'),
+                order.some((c) => c.init === null) ? el('button', {
+                    type: 'button', class: 'link-btn', title: 'Roll d20 + modifier for everyone without an initiative',
+                    onclick: () => {
+                        const rolled = [];
+                        initAction((st) => ({ ...st, combatants: st.combatants.map((c) => {
+                            if (c.init !== null) return c;
+                            const r = rollInitiative(c.mod);
+                            rolled.push(c.name + ' ' + r.value);
+                            return { ...c, init: r.value };
+                        }) }));
+                        toast('Rolled: ' + rolled.join(', '));
+                    },
+                }, 'Roll for the rest') : null,
                 hasMonsters ? el('button', {
                     type: 'button', class: 'link-btn', title: 'Remove every monster and reset the round, keeping the party',
                     onclick: () => initAction((st) => ({ ...Init.endCombat(st), combatants: st.combatants.filter((c) => c.kind === 'pc') })),
@@ -756,10 +778,15 @@ import * as Backup from './backup.js';
                 }, 'Clear all')));
     }
 
-    function renderInitRow(c) {
+    function renderInitRow(row) {
+        // A player linked to a saved character shows and changes that character's HP and conditions
+        const ch = row.charId ? characters.find((x) => x.id === row.charId) : null;
+        const c = ch ? { ...row, name: ch.name, maxHp: ch.maxHp, hp: ch.hp, ac: ch.ac, conditions: ch.conditions } : row;
         const active = c.id === initState.activeId;
         const down = c.maxHp !== null && c.hp <= 0;
         const update = (fn) => initAction(Init.updateCombatant, c.id, fn);
+        const changeHpBy = (delta) => (ch ? updateCharacter(Party.changeHp(ch, delta)) : update((x) => Init.changeHp(x, delta)));
+        const toggleCond = (x) => (ch ? updateCharacter(Party.toggleCondition(ch, x)) : update((y) => Init.toggleCondition(y, x)));
 
         const score = el('input', {
             type: 'number', inputmode: 'numeric', class: 'init-score',
@@ -780,7 +807,7 @@ import * as Backup from './backup.js';
 
         const condSelect = el('select', {
             class: 'init-cond-add', 'aria-label': 'Add a condition to ' + c.name,
-            onchange: (e) => { const v = e.currentTarget.value; if (v) update((x) => Init.toggleCondition(x, v)); },
+            onchange: (e) => { const v = e.currentTarget.value; if (v) toggleCond(v); },
         }, el('option', { value: '', text: '+ Condition' }),
             ...Init.CONDITIONS.filter((x) => !c.conditions.includes(x)).map((x) => el('option', { value: x, text: x })));
 
@@ -792,14 +819,15 @@ import * as Backup from './backup.js';
             const amount = el('input', { type: 'number', inputmode: 'numeric', min: 1, class: 'init-hp-amount', placeholder: 'Amt', 'aria-label': 'Damage or healing for ' + c.name });
             const apply = (sign) => {
                 const v = Math.abs(Math.trunc(Number(amount.value))) || 1;   // empty: 1 HP
-                update((x) => Init.changeHp(x, sign * v));
+                changeHpBy(sign * v);
             };
             hpBlock = el('form', {
                 class: 'init-hp',
                 onsubmit: (e) => { e.preventDefault(); apply(-1); },
             },
                 el('div', { class: 'init-hp-top' },
-                    el('span', { class: 'init-hp-text' }, el('strong', { text: c.hp }), ' / ' + c.maxHp),
+                    el('span', { class: 'init-hp-text' }, el('strong', { text: c.hp }), ' / ' + c.maxHp,
+                        ch?.tempHp ? el('span', { class: 'party-temp', text: ' +' + ch.tempHp + ' temp' }) : null),
                     el('div', { class: 'init-hp-bar', role: 'progressbar', 'aria-label': c.name + ' hit points', 'aria-valuemin': 0, 'aria-valuemax': c.maxHp, 'aria-valuenow': c.hp },
                         el('span', { class: 'init-hp-fill ' + (pct > 50 ? 'is-high' : pct > 25 ? 'is-mid' : 'is-low'), style: 'width:' + pct + '%' }))),
                 el('div', { class: 'init-hp-edit' },
@@ -817,15 +845,20 @@ import * as Backup from './backup.js';
                 el('div', { class: 'init-name-row' },
                     el('span', { class: 'init-kind', title: c.kind === 'pc' ? 'Player' : 'Monster' }, icon(c.kind === 'pc' ? 'person-fill' : 'emoji-angry')),
                     el('span', { class: 'init-name', text: c.name }),
+                    ch ? el('button', {
+                        type: 'button', class: 'init-linked', title: 'Linked to ' + ch.name + '’s sheet: HP and conditions stay in step. Click to open the sheet.',
+                        'aria-label': 'Open ' + ch.name + '’s sheet', onclick: () => openSheet(ch.id),
+                    }, icon('link-45deg')) : null,
                     c.ac !== null ? el('span', { class: 'init-badge', title: 'Armor Class' }, icon('shield-fill'), ' ' + c.ac) : null,
                     el('span', { class: 'init-mod', title: 'Initiative modifier', text: (c.mod >= 0 ? '+' : '−') + Math.abs(c.mod) }),
-                    down ? el('span', { class: 'init-down', text: c.kind === 'pc' ? 'Down' : 'Defeated' }) : null),
+                    ch ? downBadge(ch) : down ? el('span', { class: 'init-down', text: c.kind === 'pc' ? 'Down' : 'Defeated' }) : null),
                 el('div', { class: 'init-conds' },
                     ...c.conditions.map((x) => el('button', {
                         type: 'button', class: 'init-cond', title: 'Remove ' + x, 'aria-label': 'Remove ' + x + ' from ' + c.name,
-                        onclick: () => update((y) => Init.toggleCondition(y, x)),
+                        onclick: () => toggleCond(x),
                     }, x, icon('x'))),
-                    condSelect)),
+                    condSelect),
+                ch && down ? deathSaves(ch) : null),
             hpBlock,
             el('button', {
                 type: 'button', class: 'icon-btn init-remove', title: 'Remove ' + c.name, 'aria-label': 'Remove ' + c.name,
@@ -853,6 +886,7 @@ import * as Backup from './backup.js';
     function redrawCharacterViews() {
         renderCharacterList();
         renderPartyBody();
+        renderInitList();   // linked players show their character's HP and conditions
         renderNav();
     }
     async function saveCharacters(next) {
@@ -875,6 +909,19 @@ import * as Backup from './backup.js';
     }
 
     const ordinal = (n) => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
+    // Add characters to the Initiative tracker as linked players (initiative left for them to roll)
+    function sendToInitiative(members, { open = true } = {}) {
+        const entries = members.map((c) => ({ charId: c.id, name: c.name, mod: Party.initiativeBonus(c), hp: c.maxHp, currentHp: c.hp, ac: c.ac }));
+        const { state, added } = Init.addCharacters(initState, entries);
+        if (added.length) {
+            initAction(() => state);
+            toast('Added ' + added.map((c) => c.name).join(', ') + ' to Initiative');
+        } else {
+            toast(members.length ? 'They’re already in Initiative' : 'No one is playing in this party');
+        }
+        if (open) goToInitiative();
+    }
+
     const statBox = (label, value, title) => el('div', { class: 'party-stat', title },
         el('span', { class: 'party-stat-label', text: label }), el('strong', { text: value }));
 
@@ -1025,7 +1072,20 @@ import * as Backup from './backup.js';
                     el('div', { class: 'content-kicker', text: 'Tools' }),
                     el('h1', { class: 'content-title', text: 'Characters' }),
                     el('p', { class: 'content-blurb', text: 'Your players’ characters: level, HP, AC, ability scores and gear. Group them into parties under Party. Saved in this browser.' })),
-                el('button', { type: 'button', class: 'btn-gold', onclick: () => openSheet(null) }, icon('person-plus'), el('span', { text: 'New character' }))),
+                el('div', { class: 'pt-head-btns' },
+                    el('label', { class: 'btn-outline-gold', title: 'Add a character from a file someone sent you' },
+                        el('input', {
+                            type: 'file', accept: '.json,application/json', class: 'visually-hidden',
+                            onchange: async (e) => {
+                                const file = e.currentTarget.files[0];
+                                e.currentTarget.value = '';
+                                if (!file) return;
+                                if (file.size > 1024 * 1024) { toast('That file is too big to be a character'); return; }
+                                try { previewCharacter(Party.parseCharacterFile(await file.text()), 'file'); }
+                                catch (err) { toast(err.message); }
+                            },
+                        }), icon('upload'), el('span', { text: 'Import' })),
+                    el('button', { type: 'button', class: 'btn-gold', onclick: () => openSheet(null) }, icon('person-plus'), el('span', { text: 'New character' })))),
             charList);
         renderCharacterList();
     }
@@ -1183,13 +1243,21 @@ import * as Backup from './backup.js';
         }, icon('moon-stars'), ' Long rest') : null;
 
         const avg = active.length ? Math.round(active.reduce((n, c) => n + c.level, 0) / active.length) : 0;
+        const withAc = active.filter((c) => c.ac !== null);
+        const avgAc = withAc.length ? Math.round(withAc.reduce((n, c) => n + c.ac, 0) / withAc.length) : null;
+        const lowPerc = active.length ? Math.min(...active.map(Party.passivePerception)) : null;
+        const toInit = active.length ? el('button', {
+            type: 'button', class: 'btn-gold btn-sm-gold', title: 'Add everyone playing to the Initiative tracker',
+            onclick: () => sendToInitiative(active),
+        }, icon('list-ol'), ' To Initiative') : null;
         fill(partyBody,
             partyForm === 'rename' ? partyNameForm('rename') : bar,
             el('div', { class: 'pt-summary' },
                 el('span', { class: 'cz-vis-count', text: members.length
                     ? active.length + ' playing' + (away.length ? ' · ' + away.length + ' away' : '') + (active.length ? ' · average level ' + avg : '')
+                        + (avgAc !== null ? ' · average AC ' + avgAc : '') + (lowPerc !== null ? ' · lowest passive Perception ' + lowPerc : '')
                     : 'No one in this party yet.' }),
-                active.length ? el('span', { class: 'pt-summary-btns' }, restAll, levelAll) : null),
+                active.length ? el('span', { class: 'pt-summary-btns' }, toInit, restAll, levelAll) : null),
             members.length ? el('ul', { class: 'pt-list' }, ...active.map((c) => renderPartyRow(p, c))) : null,
             away.length ? el('h2', { class: 'section-label pt-away-label', text: 'Not playing this session' }) : null,
             away.length ? el('ul', { class: 'pt-list is-away' }, ...away.map((c) => renderPartyRow(p, c))) : null,
@@ -1252,12 +1320,61 @@ import * as Backup from './backup.js';
         sheet.title.textContent = c ? c.name : 'New character';
         sheet.del.hidden = !c;
         sheet.error.textContent = '';
-        fill(sheet.body, ...renderSheet(c || Party.createCharacter({ name: '?' })));
+        fill(sheet.body, c ? sheetTools(c) : null, ...renderSheet(c || Party.createCharacter({ name: '?' })));
         if (!c) sheet.form.elements.name.value = '';
         updateDerived();
         sheetModal.show();
     }
     sheet.modalEl.addEventListener('shown.bs.modal', () => { if (!sheetId) sheet.form.elements.name.focus(); });
+
+    // Share, download or duplicate a saved character (uses the saved version, not unsaved edits)
+    function sheetTools(c) {
+        return el('div', { class: 'ps-tools' },
+            el('button', { type: 'button', class: 'link-btn', onclick: () => shareCharacter(c) }, icon('link-45deg'), ' Share link'),
+            el('button', { type: 'button', class: 'link-btn', onclick: () => { downloadJson(Party.characterFile(c), Party.characterFilename(c)); toast('Downloaded ' + c.name); } }, icon('download'), ' Download'),
+            el('button', {
+                type: 'button', class: 'link-btn',
+                onclick: () => {
+                    if (characters.length >= Party.LIMITS.maxCharacters) { toast('You can have up to ' + Party.LIMITS.maxCharacters + ' characters'); return; }
+                    const copy = Party.copyOf(Party.portable(c), characters.map((x) => x.name));
+                    saveCharacters(Party.upsert(characters, copy));
+                    sheetModal.hide();
+                    toast('Made a copy: ' + copy.name);
+                },
+            }, icon('copy'), ' Duplicate'));
+    }
+
+    function shareCharacter(c) {
+        const payload = { type: 'character', character: Party.portable(c) };
+        if (!shareUrlFor(payload)) { toast('Too much on this sheet for a link. Use Download and send the file instead'); return; }
+        shareLink(payload, c.name);
+    }
+
+    // Add a character from a link or a file, after showing what it is
+    function previewCharacter(fields, source) {
+        const c = Party.normalizeCharacter({ ...(fields || {}), id: 'preview' });
+        if (!c) { toast('That character couldn’t be read'); return; }
+        const full = characters.length >= Party.LIMITS.maxCharacters;
+        const same = characters.some((x) => x.name.toLowerCase() === c.name.toLowerCase());
+        openShareModal('Character: ' + c.name, [
+            el('div', { class: 'share-preview' },
+                el('span', { class: 'combo-icon' }, icon('person-vcard')),
+                el('div', {},
+                    el('strong', { text: Party.summary(c) }),
+                    c.player ? el('div', { class: 'party-player', text: 'Played by ' + c.player }) : null)),
+            el('div', { class: 'party-stats share-stats' },
+                statBox('AC', c.ac ?? '—'), statBox('HP', c.maxHp === null ? '—' : c.hp + '/' + c.maxHp),
+                statBox('Init', Party.signed(Party.initiativeBonus(c))), statBox('Perc', Party.passivePerception(c)), statBox('Prof', Party.signed(Party.proficiency(c.level)))),
+            same ? el('p', { class: 'dice-info', text: 'You already have a character called ' + c.name + '. This adds a separate copy.' }) : null,
+            full ? el('p', { class: 'dice-info', text: 'You have the most characters allowed (' + Party.LIMITS.maxCharacters + '). Delete one to add this.' }) : null,
+            el('p', { class: 'cz-sub', text: source === 'file' ? 'From a character file. It’s saved only in this browser.' : 'Shared by link. It’s saved only in this browser.' }),
+        ], full ? null : 'Add to my characters', async () => {
+            const copy = Party.copyOf(Party.portable(c), characters.map((x) => x.name));
+            await saveCharacters(Party.upsert(characters, copy));
+            goToCharacters();
+            toast('Added ' + copy.name + ' to your characters');
+        });
+    }
 
     function renderSheet(c) {
         const field = (label, input, cls = '') => el('label', { class: ('be-field ' + cls).trim() }, el('span', { text: label }), input);
@@ -2199,6 +2316,7 @@ import * as Backup from './backup.js';
         if (!data) { toast('That share link couldn’t be read'); return; }
         if (data.type === 'build') return previewSharedBuild(data.build);
         if (data.type === 'roll') return previewSharedRoll(data.roll);
+        if (data.type === 'character') return previewCharacter(data.character, 'link');
         if (data.type === 'result') return showSharedResult(data.result);
         toast('That share link couldn’t be read');
     }

@@ -48,8 +48,8 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | ⚡ **Quick builds** | Roll several tables at once: a Quick NPC, Tavern, Town, Villain or Side Quest. Reroll any single line you don't like. |
 | 🛠️ **Your own builds** | Create Quick builds from any tables: name each line, pick an icon, reorder lines, or copy a built-in build as a starting point. |
 | 🎯 **Dice roller** | d4 to d100 with a count, modifier and advantage/disadvantage, or type any notation (`2d6+3`, `4d6kh3`, `1d20+1d4`). Save named rolls like *Longsword attack* to reuse in one click. Dice written inside prompts ("lasts *1d4* hours", "*2d4×100* gp") are clickable too. Shows every die, highlights natural 20s and 1s, and uses fair cryptographic randomness. |
-| 🧝 **Characters** | Keep each player's character on a simple sheet: race, class, level, HP, AC, speed, ability scores (modifiers, proficiency, initiative and passive Perception worked out for you), armor, weapons, inventory, coins and notes. Quick damage/heal and a Level up button on every card. During play, track Inspiration, conditions, exhaustion, death saves, spell slots (including Pact Magic) and hit dice, with short rests (roll hit dice to heal) and long rests. |
-| 🛡️ **Parties** | Group characters into named parties, one per campaign or table. Switch off anyone who isn't playing this session, see the party at a glance with conditions and HP, open any row for slots and rests, and level up or long rest everyone at once. |
+| 🧝 **Characters** | Keep each player's character on a simple sheet: race, class, level, HP, AC, speed, ability scores (modifiers, proficiency, initiative and passive Perception worked out for you), armor, weapons, inventory, coins and notes. Quick damage/heal and a Level up button on every card. During play, track Inspiration, conditions, exhaustion, death saves, spell slots (including Pact Magic) and hit dice, with short rests (roll hit dice to heal) and long rests. Share a character by link, download it as a file, import one someone sent you, or duplicate it. |
+| 🛡️ **Parties** | Group characters into named parties, one per campaign or table. Switch off anyone who isn't playing this session, see the party at a glance with conditions and HP, open any row for slots and rests, and level up or long rest everyone at once. Send the party to Initiative in one click: players stay linked to their sheets, so damage, healing and conditions in combat land on the character. |
 | ⚔️ **Initiative tracker** | Add your party and monsters (numbered automatically, initiative rolled for you), then step through turns and rounds. Track HP with quick damage/heal, AC and conditions. Defeated monsters are skipped, and it all survives a refresh. |
 | 🔁 **Roll several, no repeats** | Roll ×2, ×3 or ×5 different prompts at once, each with its own reroll. Turn on *Don't repeat prompts* and every table hands out each entry once before reshuffling; tiles show how many are left. |
 | 🔀 **Surprise me** | Roll on a random table, or on any table within the current category. |
@@ -354,6 +354,7 @@ Recommended Render settings (service → **Settings**):
 - [x] Initiative tracker
 - [x] Characters and parties (step 1: the basic sheet)
 - [x] Play tracking: conditions, death saves, spell slots, hit dice, rests, Inspiration
+- [x] Party in Initiative (linked HP and conditions), share, import and duplicate characters
 - [x] Edit tables directly in the browser (entries, new tables, personal copies)
 - [x] Rename and move tables, create and rename categories
 - [x] Works offline (opt-in) and installs as an app

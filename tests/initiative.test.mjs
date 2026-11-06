@@ -101,3 +101,21 @@ test('normalizeState restores saved data and drops junk', () => {
     assert.deepEqual(normalizeState('garbage'), emptyState());
     assert.deepEqual(normalizeState({ combatants: saved.combatants, round: 2, activeId: 'gone' }).round, 0);
 });
+
+test('characters join as linked players, once each', async () => {
+    const { addCharacters } = await import('../static/scripts/initiative.js');
+    const start = { combatants: [createCombatant({ name: 'Goblin', init: 12 })], round: 0, activeId: null };
+    const entries = [
+        { charId: 'p-1', name: 'Aria', mod: 3, hp: 36, currentHp: 20, ac: 15 },
+        { charId: 'p-2', name: 'Nyx', mod: 2, hp: null, currentHp: null, ac: 13 },
+    ];
+    const first = addCharacters(start, entries);
+    assert.equal(first.added.length, 2);
+    const aria = first.state.combatants.find((c) => c.charId === 'p-1');
+    assert.deepEqual([aria.kind, aria.init, aria.maxHp, aria.hp, aria.ac, aria.mod], ['pc', null, 36, 20, 15, 3]);
+    assert.equal(first.state.combatants.find((c) => c.charId === 'p-2').maxHp, null);
+    const again = addCharacters(first.state, entries);
+    assert.equal(again.added.length, 0, 'already in the tracker');
+    assert.equal(again.state, first.state);
+    assert.equal(normalizeState(JSON.parse(JSON.stringify(first.state))).combatants[1].charId, 'p-1', 'the link survives saving');
+});

@@ -2,8 +2,9 @@
 //
 // State: { combatants: [Combatant], round, activeId }
 //   round 0 = combat not started.
-// Combatant: { id, name, kind: 'pc' | 'npc', mod, init, maxHp, hp, ac, conditions: [] }
-//   maxHp/hp/ac are null when not tracked.
+// Combatant: { id, name, kind: 'pc' | 'npc', mod, init, maxHp, hp, ac, conditions: [], charId }
+//   maxHp/hp/ac are null when not tracked. charId links a player to a saved character (party.js):
+//   the page then shows and changes that character's HP and conditions instead of these.
 
 export const CONDITIONS = [
     'Blinded', 'Charmed', 'Concentrating', 'Deafened', 'Frightened', 'Grappled', 'Incapacitated',
@@ -22,7 +23,7 @@ const clampInt = (v, lo, hi, fallback = null) => {
 let seq = 0;
 export const newId = () => 'c-' + Date.now().toString(36) + (seq++).toString(36) + Math.random().toString(36).slice(2, 5);
 
-export function createCombatant({ name, kind = 'npc', mod = 0, init = null, hp = null, ac = null, id = newId() }) {
+export function createCombatant({ name, kind = 'npc', mod = 0, init = null, hp = null, ac = null, id = newId(), charId = null }) {
     const maxHp = clampInt(hp, 1, LIMITS.maxHp);
     return {
         id,
@@ -34,6 +35,7 @@ export function createCombatant({ name, kind = 'npc', mod = 0, init = null, hp =
         hp: maxHp,
         ac: clampInt(ac, 0, 99),
         conditions: [],
+        charId: typeof charId === 'string' && charId ? charId : null,
     };
 }
 
@@ -124,6 +126,15 @@ export function toggleCondition(c, condition) {
     if (!CONDITIONS.includes(condition)) return c;
     const has = c.conditions.includes(condition);
     return { ...c, conditions: has ? c.conditions.filter((x) => x !== condition) : [...c.conditions, condition] };
+}
+
+// Linked players already in the tracker are skipped. Returns { state, added }.
+export function addCharacters(state, entries) {
+    const linked = new Set(state.combatants.map((c) => c.charId).filter(Boolean));
+    const room = LIMITS.maxCombatants - state.combatants.length;
+    const added = entries.filter((e) => e.charId && !linked.has(e.charId)).slice(0, Math.max(0, room))
+        .map((e) => ({ ...createCombatant({ ...e, kind: 'pc' }), hp: e.currentHp ?? clampInt(e.hp, 1, LIMITS.maxHp) }));
+    return { state: added.length ? { ...state, combatants: [...state.combatants, ...added] } : state, added };
 }
 
 // Restore a saved state, dropping anything malformed.
