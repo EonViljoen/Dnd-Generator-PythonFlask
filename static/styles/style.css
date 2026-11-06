@@ -2558,3 +2558,41 @@ select.be-input { appearance: auto; }
 @media (max-width: 899.98px) {
     .table-form-fields { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* =========================================================
+   Offline copy & installable app
+   ========================================================= */
+.offline-offer {
+    display: flex;
+    gap: 0.85rem;
+    padding: 0.9rem 1rem;
+    margin-bottom: 1.25rem;
+    border: 1px solid var(--gold-line);
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--gold-soft), transparent 70%), var(--surface);
+    animation: wake-in 0.3s ease-out;
+}
+.offline-offer[hidden] { display: none; }
+.offline-offer-icon { font-size: 1.5rem; color: var(--gold); line-height: 1.1; flex: none; }
+.offline-offer-body { min-width: 0; }
+.offline-offer-body strong { display: block; font-family: var(--font-display); font-size: 1.02rem; margin-bottom: 0.2rem; }
+.offline-offer-body p { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.88rem; line-height: 1.45; }
+.offline-offer-actions { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+.offline-offer-actions .link-btn { margin: 0; }
+
+.cz-install { margin-top: 0.6rem; }
+.cz-install .cz-sub { margin: 0.4rem 0 0; }
+.cz-install .cz-sub .bi { color: var(--gold); }
+.install-hint { font-size: 0.8rem; }
+.install-note {
+    padding: 0.7rem 0.85rem;
+    border-radius: 10px;
+    border: 1px solid var(--gold-line);
+    background: var(--gold-soft);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 0;
+}
+.install-note .bi { color: var(--gold); }
+#cz-offline-error:empty { display: none; }
+#cz-offline-update[hidden] { display: none; }

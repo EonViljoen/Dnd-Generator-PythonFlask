@@ -60,6 +60,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 🎨 **Themes** | Five presets (Tavern, Arcane, Forest, Frost and the light Parchment), or build your own from 7 colours with a live preview and a readability check. Saved in your browser and applied before the page draws. |
 | 🔒 **Private by design** | Custom tables, builds, pins and history stay in your browser. Nothing is uploaded and there are no accounts. |
 | 📱 **Works anywhere** | Responsive layout: sidebar on desktop, scrolling category chips and a bottom result sheet on phones. |
+| 📲 **Offline & installable** | Install it as an app (its own window, home-screen icon). Optionally save the built-in tables (about 2 MB, only after you agree) so everything works without internet and opens instantly, even while Render's server is waking up. Saved tables update themselves when the prompts change. |
 
 ### Keyboard shortcuts
 
@@ -132,9 +133,10 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API) | Stores custom JSON tables, custom Quick builds and saved dice rolls in the browser |
 | [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history, hidden tables, dice settings, the initiative tracker, your theme, and roll options (×N, seen entries for no repeats) |
 | [Web Crypto](https://developer.mozilla.org/docs/Web/API/Crypto/getRandomValues) | Unbiased dice rolls (`crypto.getRandomValues` with rejection sampling) |
-| [Bootstrap 5.3](https://getbootstrap.com/) | Modals and base styles (dark theme) |
-| [Bootstrap Icons 1.11](https://icons.getbootstrap.com/) | Every icon in the app, including the category and build icon picker |
-| [Google Fonts](https://fonts.google.com/) | *Cinzel* for headings, *EB Garamond* for prompt text |
+| [Bootstrap 5.3](https://getbootstrap.com/) | Modals and base styles (self-hosted in `static/vendor`) |
+| [Bootstrap Icons 1.11](https://icons.getbootstrap.com/) | Every icon in the app, including the category and build icon picker (self-hosted) |
+| [Cinzel and EB Garamond](https://fonts.google.com/) | Headings and prompt text (self-hosted, latin subset, SIL Open Font License) |
+| [Service worker](https://developer.mozilla.org/docs/Web/API/Service_Worker_API) and [web app manifest](https://developer.mozilla.org/docs/Web/Manifest) | Offline pages and files, installable app |
 | Custom CSS | Themes built on CSS custom properties: 7 base colours per theme, every other shade derived with `color-mix()` |
 
 ### Hosting and tooling
@@ -231,9 +233,11 @@ node --test tests/*.test.mjs
 │   │   ├── dice.js       # Dice notation parser and fair roller (no DOM, testable in Node)
 │   │   ├── initiative.js # Initiative tracker state: order, turns, HP, conditions (no DOM)
 │   │   └── edits.js      # Table editing and personal copies (no DOM)
-│   ├── sw.js             # Service worker: instant pages during Render cold starts
+│   ├── sw.js             # Service worker: pages and files work offline / during cold starts
+│   ├── manifest.webmanifest  # Installable app: name, icons, shortcuts
+│   ├── vendor/           # Self-hosted Bootstrap, Bootstrap Icons and fonts (with licences)
 │   ├── styles/style.css  # Theme and layout
-│   └── images/           # Favicon (SVG, ICO) and Apple touch icon
+│   └── images/           # Favicon (SVG, ICO), Apple touch icon, app icons (192, 512, maskable)
 ├── tests/                # pytest (pages, API, data) and Node tests (dice, initiative, editing)
 ├── .github/workflows/    # Automated checks on every push
 ├── docs/screenshots/      # README screenshots
@@ -308,7 +312,8 @@ All endpoints are `GET` and return JSON.
 
 | Endpoint | Returns |
 |----------|---------|
-| `/api/health` | `{status: "ok", categories, tables, prompts, commit, python}`, a quick check for monitors and Render (`commit` is the deployed Git commit on Render, `python` the server's Python version) |
+| `/api/health` | `{status: "ok", categories, tables, prompts, commit, python, data_version}`, a quick check for monitors and Render (`commit` is the deployed Git commit on Render, `python` the server's Python version, `data_version` a hash of the prompt data) |
+| `/api/bundle` | `{version, structure, combos, data}`: everything needed to work offline, in one download (used only after the user agrees to save the tables) |
 | `/api/structure` | Categories with icon, blurb, totals and tables (no entry text) |
 | `/api/random` | A random entry from a random table: `{category, sub, text}`. Optional `?category=` |
 | `/api/r/<category>?arg=<table>` | A random entry from one table |
@@ -332,7 +337,7 @@ Recommended Render settings (service → **Settings**):
 - **Auto-Deploy: After CI Checks Pass**, so a push that fails the checks never goes live and the last good version keeps running.
 - **Health Checks → path `/api/health`**, so Render only switches traffic to a new deploy once it answers, and restarts an instance that stops responding.
 
-**Cold starts:** Render's free tier puts the server to sleep when idle, and waking it can take up to a minute. A service worker ([`static/sw.js`](static/sw.js)) keeps a copy of the pages, so returning visitors get the page straight away and see a *"Waking up the tavern…"* screen that retries until the API answers, then carries on by itself. A visitor's very first visit still waits for the server.
+**Cold starts:** Render's free tier puts the server to sleep when idle, and waking it can take up to a minute. A service worker ([`static/sw.js`](static/sw.js)) keeps a copy of the pages and their files, so returning visitors get the page straight away. Visitors who chose to save the tables start instantly from that copy and the app checks for updates in the background; everyone else sees a *"Waking up the tavern…"* screen that retries until the API answers. A visitor's very first visit still waits for the server.
 
 ## Roadmap
 
@@ -344,4 +349,5 @@ Recommended Render settings (service → **Settings**):
 - [x] Initiative tracker
 - [x] Edit tables directly in the browser (entries, new tables, personal copies)
 - [x] Rename and move tables, create and rename categories
+- [x] Works offline (opt-in) and installs as an app
 - [ ] Optional accounts to sync tables and builds across devices

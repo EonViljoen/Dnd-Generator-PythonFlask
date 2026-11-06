@@ -7,13 +7,19 @@
 //   use the saved copy. Successful responses refresh the saved copy, so a deploy shows up
 //   on the next visit while the server is awake.
 
-const CACHE = 'dnd-shell-v1';
+const CACHE = 'dnd-shell-v2'; // bump when the list of saved files changes
 const TIMEOUT = 2500;
 const SHELL = [
     '/', '/cards',
     '/styles/style.css',
     '/scripts/theme.js', '/scripts/app.js', '/scripts/data.js', '/scripts/dice.js', '/scripts/initiative.js', '/scripts/edits.js',
-    '/images/favicon.svg', '/images/favicon.ico',
+    '/images/favicon.svg', '/images/favicon.ico', '/images/icon-192.png', '/images/icon-512.png',
+    '/manifest.webmanifest',
+    '/vendor/bootstrap/bootstrap.min.css', '/vendor/bootstrap/bootstrap.bundle.min.js',
+    '/vendor/bootstrap-icons/bootstrap-icons.min.css',
+    '/vendor/bootstrap-icons/fonts/bootstrap-icons.woff2?dd67030699838ea613ee6dbda90effa6',
+    '/vendor/fonts/fonts.css',
+    '/vendor/fonts/cinzel-97f503ba.woff2', '/vendor/fonts/eb-garamond-fbc7eeae.woff2', '/vendor/fonts/eb-garamond-0c00b5f8.woff2',
 ];
 
 self.addEventListener('install', (event) => {

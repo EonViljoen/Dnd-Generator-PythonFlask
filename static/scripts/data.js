@@ -356,9 +356,15 @@ export function iconFor(category, custom, serverStructure) {
 
 let baseData = null; // the built-in tables, cached once loaded (merge mode)
 
-// Pick the source for the stored custom data (or the server if there is none).
-export async function createSource(custom, serverStructure) {
-    if (!custom) return new ServerSource(serverStructure);
+// The built-in tables, from the saved offline copy, so merge mode doesn't need the server
+export function setBaseData(data) { baseData = data; }
+
+// Pick the source: the saved offline copy, the stored custom data, or the server.
+export async function createSource(custom, serverStructure, offline = null) {
+    if (!custom) {
+        if (!offline) return new ServerSource(serverStructure);
+        return new LocalSource(offline.data, Object.fromEntries(serverStructure.map((c) => [c.name, { ...c }])));
+    }
     const meta = Object.fromEntries(serverStructure.map((c) => [c.name, { ...c }]));
     for (const cat of Object.keys(custom.data)) {
         meta[cat] = { ...meta[cat], icon: iconFor(cat, custom, serverStructure) };
@@ -391,5 +397,50 @@ export function decodeShare(token) {
         return isPlainObject(data) && data.v === 1 ? data : null;
     } catch {
         return null;
+    }
+}
+
+// ---------- Offline copy of the built-in tables (opt-in) ----------
+// Saved only after the user agrees. Stored shape:
+//   { version, savedAt, structure, combos, data, prompts }
+const OFFLINE_KEY = 'offline';
+
+export const offlineData = {
+    async load() {
+        try {
+            const r = await storage.get(OFFLINE_KEY);
+            return r && isPlainObject(r.data) && Array.isArray(r.structure) ? r : null;
+        } catch {
+            return null;
+        }
+    },
+    async save(bundle) {
+        let prompts = 0;
+        for (const subs of Object.values(bundle.data)) for (const entries of Object.values(subs)) prompts += entries.length;
+        const record = {
+            version: bundle.version,
+            savedAt: new Date().toISOString(),
+            structure: bundle.structure,
+            combos: bundle.combos || [],
+            data: bundle.data,
+            prompts,
+        };
+        await storage.set(OFFLINE_KEY, record);
+        try { await navigator.storage?.persist?.(); } catch { /* ignore */ }
+        return record;
+    },
+    clear: () => storage.del(OFFLINE_KEY),
+};
+
+// fetch JSON with a time limit (used to check for updates without hanging on a sleeping server)
+export async function fetchJson(path, ms = 8000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+        const res = await fetch(path, { signal: ctrl.signal, cache: 'no-store' });
+        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+        return await res.json();
+    } finally {
+        clearTimeout(timer);
     }
 }

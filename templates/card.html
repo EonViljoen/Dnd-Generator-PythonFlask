@@ -25,6 +25,7 @@
 
       <!-- Selected category / search results -->
       <main class="content">
+        <div id="offline-offer" class="offline-offer" role="region" aria-label="Offline use" hidden></div>
         <div id="data-banner" class="data-banner" hidden></div>
         <div id="content" aria-live="polite">
           <p class="loading"><span class="spinner-border spinner-border-sm"></span> Unrolling the scrolls…</p>
@@ -118,6 +119,29 @@
       </div>
     </div>
 
+    <!-- Install the app: explain saving the tables first -->
+    <div class="modal fade" id="installModal" tabindex="-1" aria-labelledby="installModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div class="flex-grow-1">
+              <div class="modal-kicker">Install the app</div>
+              <h5 class="modal-title" id="installModalLabel">Use it offline too?</h5>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>The app opens in its own window, like any other app on your device.</p>
+            <p class="install-note"><i class="bi bi-cloud-arrow-down"></i> To work <strong>without internet</strong>, it needs to save the built-in tables in this browser. That's a one-time download of <strong>about 2 MB</strong>, updated automatically when the tables change. You can remove it any time in Customize.</p>
+          </div>
+          <div class="modal-footer be-footer">
+            <button type="button" class="btn-outline-gold" id="install-only">Install only</button>
+            <button type="button" class="btn-gold" id="install-and-save"><i class="bi bi-download"></i> Install and save tables</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- New category -->
     <div class="modal fade" id="newCategoryModal" tabindex="-1" aria-labelledby="newCategoryLabel" aria-hidden="true">
       <div class="modal-dialog">
@@ -162,6 +186,29 @@
               <p class="cz-sub">Applies to every page and is saved in this browser.</p>
               <div id="cz-theme-presets" class="theme-grid" role="group" aria-label="Theme"></div>
               <div id="cz-theme-custom" class="theme-custom" hidden></div>
+            </section>
+
+            <!-- Offline & app -->
+            <section class="cz-section">
+              <h6 class="cz-heading"><i class="bi bi-cloud-arrow-down"></i> Offline &amp; app</h6>
+              <p class="cz-sub">Saving the tables lets the generator work without internet and open instantly. It downloads all the built-in prompts (about 2 MB) into this browser; nothing is sent anywhere.</p>
+              <fieldset class="cz-modes">
+                <legend class="visually-hidden">Offline use</legend>
+                <label class="cz-mode">
+                  <input type="radio" name="cz-offline" value="online">
+                  <span><strong>Online only</strong><small>Prompts come from the server each time. Nothing extra is saved.</small></span>
+                </label>
+                <label class="cz-mode">
+                  <input type="radio" name="cz-offline" value="saved">
+                  <span><strong>Save tables for offline use</strong><small>About 2 MB in this browser. Updated automatically when the tables change.</small></span>
+                </label>
+              </fieldset>
+              <div class="cz-repeat-foot" id="cz-offline-foot" hidden>
+                <span id="cz-offline-status" class="cz-vis-count"></span>
+                <button type="button" class="link-btn" id="cz-offline-update">Check for updates</button>
+              </div>
+              <p class="dice-error" id="cz-offline-error" role="alert"></p>
+              <div class="cz-install" id="cz-install"></div>
             </section>
 
             <!-- Rolling -->
@@ -336,6 +383,6 @@
 {% endblock %}
 
 {% block scripts %}
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='scripts/app.js') }}"></script>
 {% endblock %}

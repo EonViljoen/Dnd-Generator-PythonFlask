@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import os
@@ -18,10 +19,13 @@ class JsonReader():
     """
     data = {}
     combos = []
+    version = None  # short hash of the data file; changes only when the prompts change
 
     def __init__(self):
-        with open(DATA_PATH, encoding='utf8') as file:
-            JsonReader.data = json.load(file)
+        with open(DATA_PATH, 'rb') as file:
+            raw = file.read()
+        JsonReader.data = json.loads(raw.decode('utf8'))
+        JsonReader.version = hashlib.sha256(raw).hexdigest()[:12]
         JsonReader.combos = JsonReader._valid_combos()
 
     @staticmethod
@@ -82,6 +86,16 @@ class JsonReader():
             }
             for section, subsections in JsonReader.data.items()
         ]
+
+    @staticmethod
+    def Bundle():
+        """Everything the browser needs to work offline, in one download."""
+        return {
+            'version': JsonReader.version,
+            'structure': JsonReader.GetStructure(),
+            'combos': JsonReader.GetCombos(),
+            'data': JsonReader.data,
+        }
 
     @staticmethod
     def Stats():

@@ -27,6 +27,27 @@ def test_health(client, data):
     assert body['tables'] == sum(len(subs) for subs in data.values())
     assert body['prompts'] == sum(len(entries) for subs in data.values() for entries in subs.values())
     assert body['python'].count('.') == 2  # e.g. "3.12.4": shows which Python the server runs
+    assert len(body['data_version']) == 12
+
+
+def test_bundle_for_offline_use(client, data):
+    bundle = client.get('/api/bundle').get_json()
+    assert bundle['version'] == client.get('/api/health').get_json()['data_version']
+    assert bundle['data'] == data
+    assert [c['name'] for c in bundle['structure']] == list(data)
+    assert {c['id'] for c in bundle['combos']} >= {'npc', 'tavern'}
+
+
+@pytest.mark.parametrize('path', ['/manifest.webmanifest', '/images/icon-192.png', '/images/icon-512.png', '/images/icon-maskable-512.png'])
+def test_installable_app_files(client, path):
+    with client.get(path) as res:
+        assert res.status_code == 200
+    if path.endswith('.webmanifest'):
+        with client.get(path) as res:
+            assert res.mimetype == 'application/manifest+json'
+            manifest = res.get_json(force=True)
+            assert manifest['start_url'] == '/cards' and manifest['display'] == 'standalone'
+            assert {i['sizes'] for i in manifest['icons']} >= {'192x192', '512x512'}
 
 
 def test_health_reports_render_commit(client, monkeypatch):

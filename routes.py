@@ -28,7 +28,14 @@ class Health(Resource):
             **JsonReader.Stats(),
             'commit': commit[:7] if commit else None,
             'python': platform.python_version(),
+            'data_version': JsonReader.version,
         })
+
+
+class Bundle(Resource):
+    """All tables + structure + Quick build recipes, for saving offline (opt-in in the browser)."""
+    def get(self):
+        return jsonify(JsonReader.Bundle())
 
 
 class Structure(Resource):

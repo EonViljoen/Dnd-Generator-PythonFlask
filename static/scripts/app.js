@@ -4,6 +4,7 @@ import {
     ICON_CHOICES, iconFor, userBuilds, newBuildId,
     savedRolls, newRollId, MAX_ROLL_NAME, MAX_SAVED_ROLLS,
     encodeShare, decodeShare, cleanBuild, cleanRoll, MAX_SHARE_LENGTH,
+    offlineData, setBaseData, fetchJson,
     DEFAULT_BUILD_ICON, MAX_BUILD_LINES, MIN_BUILD_LINES, MAX_TITLE_LENGTH,
 } from './data.js';
 import * as Dice from './dice.js';
@@ -2175,7 +2176,7 @@ import * as Edits from './edits.js';
 
     async function loadSource() {
         custom = await customData.load();
-        source = await createSource(custom, serverStructure);
+        source = await createSource(custom, serverStructure, offline.record);
         allStructure = await source.structure();
         recomputeVisible();
         renderBanner();
@@ -2206,6 +2207,9 @@ import * as Edits from './edits.js';
                 icon('file-earmark-code'), ' Using ',
                 el('strong', { text: custom.name || 'your file' }),
                 custom.mode === 'replace' ? ' instead of the defaults' : ' with the defaults'));
+        }
+        if (offline.record && !offline.reachable) {
+            parts.push(el('span', {}, icon('wifi-off'), ' Offline: using your saved tables (updated ' + new Date(offline.record.savedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ')'));
         }
         if (nHidden) parts.push(el('span', {}, icon('eye-slash'), ' ' + plural(nHidden, 'table') + ' hidden'));
         els.banner.hidden = !parts.length;
@@ -2263,6 +2267,7 @@ import * as Edits from './edits.js';
         for (const radio of cz.modes()) radio.checked = radio.value === mode;
         cz.exportBtn.hidden = cz.resetBtn.hidden = !custom;
         renderTheme();
+        renderOfflineSettings();
         renderRollingOptions();
         renderIcons();
         renderVisibility();
@@ -2843,6 +2848,208 @@ import * as Edits from './edits.js';
         toast('Deleted “' + existing.title + '”');
     });
 
+    // ---------- Offline copy & installable app ----------
+    // The built-in tables are only saved after the user agrees: via the one-time offer card,
+    // Customize › Offline & app, or the install dialog. Installing from the browser's own menu
+    // can't be intercepted, so the offer appears right after (appinstalled) or on first launch.
+    const OFFER_KEY = 'dnd.offlineOffer';         // 'dismissed' once the user says "Not now"
+    const OFFER_APP_KEY = 'dnd.offlineOfferApp';  // same, for the installed app
+    const offline = { record: null, reachable: true, retryTimer: null, saving: false };
+    let deferredInstall = null; // beforeinstallprompt event (Chrome/Edge/Android)
+
+    const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
+    async function useBundle(bundle, record) {
+        offline.record = record;
+        serverStructure = record.structure;
+        serverRecipes = record.combos;
+        setBaseData(record.data);
+        await loadSource();
+        refresh();
+    }
+
+    // Download and save the tables (only ever called after the user agreed)
+    async function saveOffline() {
+        if (offline.saving) return false;
+        offline.saving = true;
+        renderOfflineSettings();
+        try {
+            const bundle = await api(['bundle']);
+            const record = await offlineData.save(bundle);
+            await useBundle(bundle, record);
+            offline.reachable = true;
+            hideOffer();
+            toast('Tables saved. The generator now works offline');
+            return true;
+        } catch (err) {
+            $('cz-offline-error').textContent = 'Couldn’t save the tables (' + (err.message || err) + '). Check your connection and try again.';
+            toast('Couldn’t save the tables');
+            return false;
+        } finally {
+            offline.saving = false;
+            renderOfflineSettings();
+        }
+    }
+
+    async function removeOffline() {
+        await offlineData.clear();
+        offline.record = null;
+        setBaseData(null);
+        try {
+            const [structureNow, combosNow] = await Promise.all([api(['structure']), api(['combos']).catch(() => serverRecipes)]);
+            serverStructure = structureNow;
+            serverRecipes = combosNow;
+        } catch { /* keep what we have; the server source will retry on use */ }
+        await loadSource();
+        refresh();
+        toast('Saved tables removed. Prompts now come from the server');
+    }
+
+    // Ask the server (with a time limit) whether the saved tables are still current
+    async function checkForUpdates({ announce = false } = {}) {
+        if (!offline.record) return;
+        clearTimeout(offline.retryTimer);
+        let health;
+        try {
+            health = await fetchJson('/api/health', 10000);
+        } catch {
+            offline.reachable = false;
+            renderBanner();
+            renderOfflineSettings();
+            offline.retryTimer = setTimeout(() => checkForUpdates(), 60000); // try again in a minute
+            if (announce) toast('Can’t reach the server right now. Your saved tables still work');
+            return;
+        }
+        offline.reachable = true;
+        if (health.data_version && health.data_version !== offline.record.version) {
+            try {
+                const bundle = await api(['bundle']);
+                await useBundle(bundle, await offlineData.save(bundle));
+                toast('Your saved tables were updated');
+            } catch { /* try again next time */ }
+        } else if (announce) {
+            toast('Your saved tables are up to date');
+        }
+        renderBanner();
+        renderOfflineSettings();
+    }
+    window.addEventListener('online', () => checkForUpdates());
+    window.addEventListener('offline', () => { if (offline.record) { offline.reachable = false; renderBanner(); renderOfflineSettings(); } });
+
+    // ----- One-time offer card -----
+    const offerEl = $('offline-offer');
+    function hideOffer() { offerEl.hidden = true; fill(offerEl); }
+
+    function maybeOfferOffline() {
+        if (offline.record) return;
+        const appMode = isStandalone();
+        if (localStorage.getItem(appMode ? OFFER_APP_KEY : OFFER_KEY) === 'dismissed') return;
+        showOffer(appMode ? 'app' : 'site');
+    }
+
+    function showOffer(kind) {
+        if (offline.record) return;
+        const title = kind === 'installed' ? 'App installed. Use it offline too?' : kind === 'app' ? 'Use the app offline?' : 'Use it offline?';
+        const text = 'Save the built-in tables in this browser (about 2 MB) so the generator works without internet and opens instantly. Nothing is sent anywhere, and you can remove it any time in Customize.';
+        fill(offerEl,
+            el('div', { class: 'offline-offer-icon' }, icon('cloud-arrow-down')),
+            el('div', { class: 'offline-offer-body' },
+                el('strong', { text: title }),
+                el('p', { text }),
+                el('div', { class: 'offline-offer-actions' },
+                    el('button', { type: 'button', class: 'btn-gold btn-sm-gold', onclick: () => saveOffline() }, icon('download'), ' Save tables (about 2 MB)'),
+                    el('button', {
+                        type: 'button', class: 'link-btn',
+                        onclick: () => { try { localStorage.setItem(isStandalone() ? OFFER_APP_KEY : OFFER_KEY, 'dismissed'); } catch { /* ignore */ } hideOffer(); },
+                    }, 'Not now'))));
+        offerEl.hidden = false;
+    }
+
+    // ----- Customize › Offline & app -----
+    function renderOfflineSettings() {
+        const saved = !!offline.record;
+        for (const r of document.querySelectorAll('input[name="cz-offline"]')) {
+            r.checked = r.value === (saved ? 'saved' : 'online');
+            r.disabled = offline.saving;
+        }
+        const foot = $('cz-offline-foot');
+        foot.hidden = !saved && !offline.saving;
+        $('cz-offline-status').textContent = offline.saving
+            ? 'Saving the tables…'
+            : saved
+                ? plural(offline.record.prompts, 'prompt') + ' saved ' + shortDate(offline.record.savedAt) + (offline.reachable ? '' : ' · server not reachable, using the saved copy')
+                : '';
+        $('cz-offline-update').hidden = !saved || offline.saving;
+        renderInstallOptions();
+    }
+
+    function renderInstallOptions() {
+        const box = $('cz-install');
+        if (isStandalone()) {
+            fill(box, el('p', { class: 'cz-sub' }, icon('check-circle'), ' You’re using the installed app.'));
+        } else if (deferredInstall) {
+            fill(box, el('button', { type: 'button', class: 'btn-outline-gold btn-sm-gold', onclick: installApp }, icon('box-arrow-down'), ' Install the app'),
+                el('p', { class: 'cz-sub install-hint', text: 'Opens in its own window, like any other app on this device.' }));
+        } else if (isIOS()) {
+            fill(box, el('p', { class: 'cz-sub' }, icon('phone'), ' To install on iPhone or iPad: tap ', icon('box-arrow-up'), ' Share, then “Add to Home Screen”.'));
+        } else {
+            fill(box, el('p', { class: 'cz-sub', text: 'To install, use your browser’s “Install app” option (Chrome and Edge show it in the address bar or menu).' }));
+        }
+    }
+
+    for (const radio of document.querySelectorAll('input[name="cz-offline"]')) {
+        radio.addEventListener('change', async () => {
+            if (!radio.checked) return;
+            $('cz-offline-error').textContent = '';
+            if (radio.value === 'saved' && !offline.record) {
+                await saveOffline();
+            } else if (radio.value === 'online' && offline.record) {
+                if (window.confirm('Remove the saved tables from this browser? The generator will need the internet again.')) await removeOffline();
+                renderOfflineSettings();
+            }
+        });
+    }
+    $('cz-offline-update').addEventListener('click', () => checkForUpdates({ announce: true }));
+
+    // ----- Installing -----
+    const installModalEl = $('installModal');
+    const installModal = new bootstrap.Modal(installModalEl);
+
+    async function promptInstall() {
+        if (!deferredInstall) return;
+        const evt = deferredInstall;
+        deferredInstall = null;
+        evt.prompt();
+        try { await evt.userChoice; } catch { /* ignore */ }
+        renderInstallOptions();
+    }
+
+    // Our Install button: explain saving the tables before the browser's prompt
+    function installApp() {
+        if (offline.record) { promptInstall(); return; }
+        installModal.show();
+    }
+    $('install-only').addEventListener('click', () => { installModal.hide(); promptInstall(); });
+    $('install-and-save').addEventListener('click', async () => {
+        installModal.hide();
+        await promptInstall();      // the browser requires the prompt to follow the click directly
+        await saveOffline();
+    });
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault(); // we show our own Install button (in Customize) instead
+        deferredInstall = e;
+        renderInstallOptions();
+    });
+    // Installed from the browser's own menu: we couldn't ask first, so ask now
+    window.addEventListener('appinstalled', () => {
+        deferredInstall = null;
+        renderInstallOptions();
+        if (!offline.record) showOffer('installed');
+    });
+
     // ---------- Waking the server ----------
     // The free Render server sleeps when idle. The page may come from the service worker's saved
     // copy (sw.js) while the API is still starting, so: show a friendly screen if loading takes
@@ -2891,10 +3098,23 @@ import * as Edits from './edits.js';
     const pendingShare = takeShareToken();
     renderPins();
     renderHistory();
-    whenServerReady(() => Promise.all([api(['structure']), api(['combos']).catch(() => [])]))
-        .then(async ([data, comboList]) => {
+
+    // With a saved copy, start instantly (no waiting for a sleeping server) and check for updates after
+    async function loadTables() {
+        offline.record = await offlineData.load();
+        if (offline.record) {
+            setBaseData(offline.record.data);
+            return { structure: offline.record.structure, combos: offline.record.combos, fromSaved: true };
+        }
+        const [structureNow, combosNow] = await whenServerReady(() => Promise.all([api(['structure']), api(['combos']).catch(() => [])]));
+        return { structure: structureNow, combos: combosNow, fromSaved: false };
+    }
+
+    loadTables()
+        .then(async ({ structure: data, combos: comboList, fromSaved }) => {
             serverStructure = data;
             serverRecipes = comboList;
+            setTimeout(() => (fromSaved ? checkForUpdates() : maybeOfferOffline()), 1200);
             builds = await userBuilds.load();
             rollList = await savedRolls.load();
             try {
