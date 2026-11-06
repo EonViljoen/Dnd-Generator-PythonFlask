@@ -279,6 +279,7 @@ export function downloadJson(data, filename) {
 // Both sources expose the same async interface:
 //   structure() -> [{ name, icon, blurb, total, subcategories: [{ name, count }] }]
 //   roll(category, sub) -> text
+//   entry(category, sub, index) -> text   (used for no-repeat and multi rolls, picked in the browser)
 //   entries(category, sub) -> [text]
 //   search(q, limit) -> { total, results: [{ category, sub, index, text }] }
 
@@ -289,6 +290,7 @@ export class ServerSource {
     }
     async structure() { return this._structure; }
     roll(category, sub) { return api(['r', category], { arg: sub }); }
+    entry(category, sub, index) { return api([category], { arg: sub, id: index }); }
     entries(category, sub) { return api([category], { arg: sub }); }
     search(q, limit) { return api(['search'], { q, limit }); }
 }
@@ -318,6 +320,11 @@ export class LocalSource {
     async roll(category, sub) {
         const table = this._table(category, sub);
         return table[Math.floor(Math.random() * table.length)];
+    }
+    async entry(category, sub, index) {
+        const text = this._table(category, sub)[index];
+        if (text === undefined) throw new Error('entry not found');
+        return text;
     }
     async entries(category, sub) { return this._table(category, sub); }
     async search(q, limit = 50) {

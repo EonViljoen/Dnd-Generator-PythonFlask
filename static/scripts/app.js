@@ -102,7 +102,7 @@ import * as Init from './initiative.js';
     }
     const icon = (name, cls = '') => el('i', { class: ('bi bi-' + name + ' ' + cls).trim(), 'aria-hidden': 'true' });
     const keyOf = (category, sub) => category + '|' + sub;
-    const crumbOf = (item) => item.category + ' › ' + item.sub;
+    const crumbOf = (item) => item.category + ' › ' + item.sub + (item.multi ? ' ×' + item.multi : '');
     const sameItem = (a, b) => a && b && a.category === b.category && a.sub === b.sub && a.text === b.text;
     const plural = (n, word, many = word + 's') => n.toLocaleString() + ' ' + (n === 1 ? word : many);
     const countLabel = (n) => plural(n, 'entry', 'entries');
@@ -274,13 +274,32 @@ import * as Init from './initiative.js';
                     el('div', { class: 'content-kicker', text: plural(cat.subcategories.length, 'table') + ' · ' + plural(cat.total, 'prompt') }),
                     el('h1', { class: 'content-title', text: cat.name }),
                     el('p', { class: 'content-blurb', text: cat.blurb })),
-                el('button', {
-                    type: 'button',
-                    class: 'btn-outline-gold',
-                    title: 'Roll on a random ' + cat.name + ' table',
-                    onclick: () => rollRandomTable(cat),
-                }, icon('shuffle'), el('span', { text: 'Roll any table' }))),
+                el('div', { class: 'content-head-tools' },
+                    renderRollCount(),
+                    el('button', {
+                        type: 'button',
+                        class: 'btn-outline-gold',
+                        title: 'Roll on a random ' + cat.name + ' table',
+                        onclick: () => rollRandomTable(cat),
+                    }, icon('shuffle'), el('span', { text: 'Roll any table' })))),
             el('div', { class: 'tiles' }, ...cat.subcategories.map((sub) => renderTile(cat.name, sub))));
+    }
+
+    // "Roll ×1 ×2 ×3 ×5": how many different entries a table roll gives
+    function renderRollCount() {
+        return el('div', { class: 'roll-count', role: 'group', 'aria-label': 'Prompts per roll' },
+            el('span', { class: 'roll-count-label', text: 'Roll' }),
+            ...ROLL_COUNTS.map((n) => el('button', {
+                type: 'button',
+                class: 'dice-mode-btn',
+                'aria-pressed': String(rollCount === n),
+                title: n === 1 ? 'One prompt per roll' : n + ' different prompts per roll',
+                onclick: (e) => {
+                    rollCount = n;
+                    save(ROLL_COUNT_KEY, n);
+                    for (const b of e.currentTarget.parentElement.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b === e.currentTarget));
+                },
+            }, '×' + n)));
     }
 
     function renderTile(category, sub, { showCategory = false, needle = '' } = {}) {
@@ -294,7 +313,7 @@ import * as Init from './initiative.js';
                 el('span', { class: 'tile-name' }, highlight(sub.name, needle)),
                 el('span', { class: 'tile-meta' },
                     icon('dice-5'),
-                    el('span', { text: (showCategory ? category + ' · ' : '') + countLabel(sub.count) }))),
+                    el('span', { class: 'tile-count', text: (showCategory ? category + ' · ' : '') + tileCountText(category, sub) }))),
             el('button', {
                 type: 'button',
                 class: 'tile-browse',
@@ -376,7 +395,7 @@ import * as Init from './initiative.js';
         try {
             const combo = combos.find((c) => c.id === id);
             if (!combo || !isRollable(combo)) throw new Error('not available');
-            const texts = await Promise.all(combo.parts.map((p) => source.roll(p.category, p.sub)));
+            const texts = await Promise.all(combo.parts.map((p) => rollEntries(p.category, p.sub, 1).then((r) => r.texts[0])));
             if (seq !== rollSeq) return;
             const parts = combo.parts.map((p, i) => ({ ...p, text: texts[i] }));
             const item = comboItem(combo.id, combo.title, parts);
@@ -396,10 +415,13 @@ import * as Init from './initiative.js';
         const row = els.text.querySelectorAll('.result-part')[index];
         if (row) row.classList.add('loading');
         try {
-            const text = await source.roll(part.category, part.sub);
+            // For a multi roll, avoid the other results already on screen
+            const avoid = before.multi ? before.parts.filter((_, i) => i !== index).map((p) => p.index) : [];
+            const { texts, indices } = await rollEntries(part.category, part.sub, 1, avoid);
+            const text = texts[0];
             if (current !== before) return; // something else was shown meanwhile
-            const parts = before.parts.map((p, i) => (i === index ? { ...p, text } : p));
-            const item = comboItem(before.comboId, before.sub, parts);
+            const parts = before.parts.map((p, i) => (i === index ? { ...p, text, index: indices[0] } : p));
+            const item = before.multi ? multiItem(before.category, before.sub, parts) : comboItem(before.comboId, before.sub, parts);
             history = history.map((h) => (sameItem(h, before) ? item : h));
             save(HISTORY_KEY, history);
             renderHistory();
@@ -1169,18 +1191,108 @@ import * as Init from './initiative.js';
         }
     });
 
+    // ---------- Picking entries (multi rolls + no repeats) ----------
+    const ROLL_COUNTS = [1, 2, 3, 5];
+    const ROLL_COUNT_KEY = 'dnd.rollCount';
+    const NO_REPEAT_KEY = 'dnd.noRepeat';
+    const SEEN_KEY = 'dnd.seen';
+    const loadJson = (key, fallback) => {
+        try { const v = JSON.parse(localStorage.getItem(key)); return v ?? fallback; } catch { return fallback; }
+    };
+    let rollCount = ROLL_COUNTS.includes(loadJson(ROLL_COUNT_KEY, 1)) ? loadJson(ROLL_COUNT_KEY, 1) : 1;
+    let noRepeat = loadJson(NO_REPEAT_KEY, false) === true;
+    let seen = (() => { const v = loadJson(SEEN_KEY, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; })();
+
+    const tableCount = (category, sub) =>
+        allStructure.find((c) => c.name === category)?.subcategories.find((s) => s.name === sub)?.count || 0;
+
+    function seenIn(category, sub) {
+        const count = tableCount(category, sub);
+        const list = Array.isArray(seen[keyOf(category, sub)]) ? seen[keyOf(category, sub)] : [];
+        return list.filter((i) => Number.isInteger(i) && i >= 0 && i < count);
+    }
+
+    function tileCountText(category, sub) {
+        if (!noRepeat) return countLabel(sub.count);
+        const left = sub.count - seenIn(category, sub.name).length;
+        return left === sub.count ? countLabel(sub.count) : left + ' of ' + sub.count + ' left';
+    }
+
+    // Pick n different entries of a table (fair, via the dice engine's crypto RNG), skipping ones
+    // already seen when "No repeats" is on, and any indices in `avoid`. Fetches just those entries.
+    async function rollEntries(category, sub, n = 1, avoid = []) {
+        const count = tableCount(category, sub);
+        if (!count) {
+            const texts = await Promise.all(Array.from({ length: n }, () => source.roll(category, sub)));
+            return { texts, indices: texts.map(() => null), reshuffled: false };
+        }
+        const key = keyOf(category, sub);
+        let used = new Set(noRepeat ? seenIn(category, sub) : []);
+        const blocked = new Set(avoid.filter((i) => Number.isInteger(i)));
+        const picks = [];
+        let reshuffled = false;
+        const want = Math.min(n, count);
+        while (picks.length < want) {
+            let pool = [];
+            for (let i = 0; i < count; i++) if (!used.has(i) && !blocked.has(i) && !picks.includes(i)) pool.push(i);
+            if (!pool.length) {
+                if (!used.size) break;      // nothing left that isn't blocked
+                used = new Set();           // every entry seen: start the table over
+                reshuffled = true;
+                continue;
+            }
+            picks.push(pool[Dice.rollDie(pool.length) - 1]);
+        }
+        if (noRepeat) {
+            seen[key] = [...used, ...picks];
+            save(SEEN_KEY, seen);
+            refreshTileCounts();
+        }
+        const texts = await Promise.all(picks.map((i) => source.entry(category, sub, i)));
+        return { texts, indices: picks, reshuffled };
+    }
+
+    function multiItem(category, sub, parts) {
+        return { category, sub, multi: parts.length, parts, text: parts.map((p, i) => (i + 1) + '. ' + p.text).join('\n\n') };
+    }
+
+    // Update "N of M left" on visible tiles without re-rendering the view
+    function refreshTileCounts() {
+        for (const tile of els.content.querySelectorAll('.tile')) {
+            const [category, sub] = tile.dataset.key.split('|');
+            const info = allStructure.find((c) => c.name === category)?.subcategories.find((s) => s.name === sub);
+            const label = tile.querySelector('.tile-count');
+            if (info && label) label.textContent = (label.textContent.startsWith(category + ' · ') ? category + ' · ' : '') + tileCountText(category, info);
+        }
+    }
+
+    function setNoRepeat(on) {
+        noRepeat = on;
+        save(NO_REPEAT_KEY, on);
+        refreshTileCounts();
+    }
+
+    function startFresh() {
+        seen = {};
+        save(SEEN_KEY, seen);
+        refreshTileCounts();
+    }
+
     // ---------- Rolling ----------
-    async function roll(category, sub) {
+    async function roll(category, sub, n = rollCount) {
         const seq = ++rollSeq;
         activeKey = keyOf(category, sub);
         markActiveTile();
         startRolling();
         try {
-            const text = await source.roll(category, sub);
+            const { texts, indices, reshuffled } = await rollEntries(category, sub, n);
             if (seq !== rollSeq) return;
-            const item = { category, sub, text };
+            const item = texts.length > 1
+                ? multiItem(category, sub, texts.map((text, i) => ({ label: 'Roll ' + (i + 1), category, sub, text, index: indices[i] })))
+                : { category, sub, text: texts[0] };
             showResult(item, { animate: true });
             addToHistory(item);
+            if (reshuffled) toast('You’ve seen every ' + sub + ' entry, so it starts over');
         } catch (err) {
             if (seq === rollSeq) showRollError(category, sub, err);
         } finally {
@@ -1285,6 +1397,9 @@ import * as Init from './initiative.js';
             const values = item.dice.terms.flatMap((t) => (t.rolls ? t.rolls.map((d) => d.value) : []));
             return { type: 'result', result: { kind: 'dice', notation: item.notation, mode: item.mode, name: item.name || null, values } };
         }
+        if (item.multi) {
+            return { type: 'result', result: { kind: 'multi', category: item.category, sub: item.sub, texts: item.parts.map((p) => p.text) } };
+        }
         if (item.parts) {
             return { type: 'result', result: { kind: 'build', title: item.sub, icon: combos.find((c) => c.id === item.comboId)?.icon, parts: item.parts.map(({ label, category, sub, text }) => ({ label, category, sub, text })) } };
         }
@@ -1382,6 +1497,12 @@ import * as Init from './initiative.js';
         if (r.kind === 'prompt') {
             const category = text(r.category, 120), sub = text(r.sub, 200), body = text(r.text, 5000);
             if (category && sub && body) item = { category, sub, text: body };
+        } else if (r.kind === 'multi' && Array.isArray(r.texts) && r.texts.length >= 2 && r.texts.length <= ROLL_COUNTS[ROLL_COUNTS.length - 1]) {
+            const category = text(r.category, 120), sub = text(r.sub, 200);
+            const texts = r.texts.map((t) => text(t, 5000));
+            if (category && sub && texts.every(Boolean)) {
+                item = multiItem(category, sub, texts.map((t, i) => ({ label: 'Roll ' + (i + 1), category, sub, text: t, index: null })));
+            }
         } else if (r.kind === 'build' && Array.isArray(r.parts) && r.parts.length <= MAX_BUILD_LINES) {
             const parts = r.parts.map((p) => ({ label: text(p?.label, 40), category: text(p?.category, 120), sub: text(p?.sub, 200), text: text(p?.text, 5000) }));
             const title = text(r.title, MAX_TITLE_LENGTH);
@@ -1422,6 +1543,7 @@ import * as Init from './initiative.js';
     const rollAgain = () => {
         if (!current) return;
         if (current.kind === 'dice') rollDice(current.notation, current.mode, current.name);
+        else if (current.multi) roll(current.category, current.sub, current.multi);
         else if (current.parts) {
             if (current.comboId && combos.some((c) => c.id === current.comboId)) rollCombo(current.comboId);
             else toast('Add this build to your builds to roll it again');
@@ -1724,9 +1846,34 @@ import * as Init from './initiative.js';
         for (const radio of cz.modes()) radio.checked = radio.value === mode;
         cz.exportBtn.hidden = cz.resetBtn.hidden = !custom;
         renderTheme();
+        renderRollingOptions();
         renderIcons();
         renderVisibility();
     }
+
+    // ---------- Rolling options (no repeats) ----------
+    const rollingUi = { toggle: $('cz-no-repeat'), foot: $('cz-repeat-foot'), count: $('cz-seen-count'), fresh: $('cz-start-fresh') };
+
+    function renderRollingOptions() {
+        rollingUi.toggle.checked = noRepeat;
+        const seenTotal = Object.keys(seen).reduce((n, key) => {
+            const [category, sub] = key.split('|');
+            return n + seenIn(category, sub).length;
+        }, 0);
+        rollingUi.foot.hidden = !noRepeat;
+        rollingUi.count.textContent = seenTotal ? plural(seenTotal, 'prompt') + ' seen so far' : 'Nothing seen yet';
+        rollingUi.fresh.hidden = !seenTotal;
+    }
+    rollingUi.toggle.addEventListener('change', () => {
+        setNoRepeat(rollingUi.toggle.checked);
+        renderRollingOptions();
+        toast(noRepeat ? 'No repeats: each table goes through every entry first' : 'Repeats allowed again');
+    });
+    rollingUi.fresh.addEventListener('click', () => {
+        startFresh();
+        renderRollingOptions();
+        toast('Starting fresh: every entry is back in play');
+    });
 
     // ---------- Theme picker (presets + custom colours; see theme.js) ----------
     const T = window.DndTheme;

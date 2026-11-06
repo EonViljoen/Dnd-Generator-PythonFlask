@@ -122,6 +122,22 @@
               <div id="cz-theme-custom" class="theme-custom" hidden></div>
             </section>
 
+            <!-- Rolling -->
+            <section class="cz-section">
+              <h6 class="cz-heading"><i class="bi bi-arrow-repeat"></i> Rolling</h6>
+              <label class="cz-switch">
+                <input type="checkbox" id="cz-no-repeat" role="switch">
+                <span>
+                  <strong>Don't repeat prompts</strong>
+                  <small>Each table gives out every entry once before any can come up again. Tiles show how many are left. Remembered in this browser.</small>
+                </span>
+              </label>
+              <div class="cz-repeat-foot" id="cz-repeat-foot" hidden>
+                <span id="cz-seen-count" class="cz-vis-count"></span>
+                <button type="button" class="link-btn" id="cz-start-fresh">Start fresh</button>
+              </div>
+            </section>
+
             <!-- Data source -->
             <section class="cz-section">
               <h6 class="cz-heading"><i class="bi bi-file-earmark-code"></i> Your own JSON</h6>

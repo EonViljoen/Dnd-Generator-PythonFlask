@@ -47,6 +47,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 🛠️ **Your own builds** | Create Quick builds from any tables: name each line, pick an icon, reorder lines, or copy a built-in build as a starting point. |
 | 🎯 **Dice roller** | d4 to d100 with a count, modifier and advantage/disadvantage, or type any notation (`2d6+3`, `4d6kh3`, `1d20+1d4`). Save named rolls like *Longsword attack* to reuse in one click. Dice written inside prompts ("lasts *1d4* hours", "*2d4×100* gp") are clickable too. Shows every die, highlights natural 20s and 1s, and uses fair cryptographic randomness. |
 | ⚔️ **Initiative tracker** | Add your party and monsters (numbered automatically, initiative rolled for you), then step through turns and rounds. Track HP with quick damage/heal, AC and conditions. Defeated monsters are skipped, and it all survives a refresh. |
+| 🔁 **Roll several, no repeats** | Roll ×2, ×3 or ×5 different prompts at once, each with its own reroll. Turn on *Don't repeat prompts* and every table hands out each entry once before reshuffling; tiles show how many are left. |
 | 🔀 **Surprise me** | Roll on a random table, or on any table within the current category. |
 | 🔍 **Search** | Search every table name and all 10k+ prompts, with highlighted matches. |
 | 📜 **Browse tables** | View any table as a numbered, filterable list, and copy or pin individual entries. |
@@ -126,7 +127,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 |------|----------|
 | Vanilla JavaScript (ES modules) | All UI logic, with no framework or build step (`app.js`, `data.js`) |
 | [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API) | Stores custom JSON tables, custom Quick builds and saved dice rolls in the browser |
-| [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history, hidden tables, dice settings, the initiative tracker and your theme |
+| [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history, hidden tables, dice settings, the initiative tracker, your theme, and roll options (×N, seen entries for no repeats) |
 | [Web Crypto](https://developer.mozilla.org/docs/Web/API/Crypto/getRandomValues) | Unbiased dice rolls (`crypto.getRandomValues` with rejection sampling) |
 | [Bootstrap 5.3](https://getbootstrap.com/) | Modals and base styles (dark theme) |
 | [Bootstrap Icons 1.11](https://icons.getbootstrap.com/) | Every icon in the app, including the category and build icon picker |

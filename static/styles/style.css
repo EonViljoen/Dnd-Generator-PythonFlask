@@ -2349,3 +2349,84 @@ select.be-input { appearance: auto; }
     0%   { transform: translateX(-100%); }
     100% { transform: translateX(290%); }
 }
+
+/* =========================================================
+   Roll options: ×N selector and "no repeats"
+   ========================================================= */
+.content-head-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+.roll-count {
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 3px;
+}
+.roll-count-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+    padding: 0 0.45rem 0 0.4rem;
+}
+.roll-count .dice-mode-btn { padding: 0.32rem 0.6rem; font-variant-numeric: tabular-nums; }
+
+.cz-switch {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+}
+.cz-switch:has(input:checked) { border-color: var(--gold); background: var(--gold-soft); }
+.cz-switch input {
+    appearance: none;
+    flex: none;
+    width: 38px;
+    height: 22px;
+    margin-top: 0.1rem;
+    border-radius: 999px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-strong);
+    position: relative;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.cz-switch input::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: transform 0.15s, background 0.15s;
+}
+.cz-switch input:checked { background: var(--gold); border-color: var(--gold); }
+.cz-switch input:checked::after { transform: translateX(16px); background: var(--on-accent); }
+.cz-switch input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.cz-switch strong { display: block; font-size: 0.92rem; }
+.cz-switch small { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.cz-repeat-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 0.6rem;
+}
+.cz-repeat-foot[hidden] { display: none; }
+.cz-repeat-foot .link-btn { margin: 0; }
+.cz-repeat-foot .link-btn[hidden] { display: none; }
+
+@media (max-width: 899.98px) {
+    .content-head-tools { width: 100%; }
+    .content-head-tools .btn-outline-gold { flex: 1; }
+    .roll-count { flex: none; }
+}
