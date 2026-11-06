@@ -198,7 +198,7 @@ Every push runs the automated checks on GitHub ([`.github/workflows/checks.yml`]
 
 | Check | What it covers |
 |-------|----------------|
-| **Python** (3.9 and 3.12) | Clean install and `pip check`; every page and API route, including 404s for bad names; data checks on `rpg_generator.json` (no empty entries, no `?` encoding glitches, no split entries, valid names, Quick builds point at real tables); the app starting under Gunicorn and passing `/api/health` |
+| **Python** (3.10 and 3.13) | Clean install and `pip check`; every page and API route, including 404s for bad names; data checks on `rpg_generator.json` (no empty entries, no `?` encoding glitches, no split entries, valid names, Quick builds point at real tables); the app starting under Gunicorn and passing `/api/health` |
 | **JavaScript** | Syntax check of every script; unit tests for the dice engine, initiative tracker and table editing |
 
 Run them locally:
@@ -308,7 +308,7 @@ All endpoints are `GET` and return JSON.
 
 | Endpoint | Returns |
 |----------|---------|
-| `/api/health` | `{status: "ok", categories, tables, prompts, commit}`, a quick check for monitors and Render (`commit` is the deployed Git commit on Render) |
+| `/api/health` | `{status: "ok", categories, tables, prompts, commit, python}`, a quick check for monitors and Render (`commit` is the deployed Git commit on Render, `python` the server's Python version) |
 | `/api/structure` | Categories with icon, blurb, totals and tables (no entry text) |
 | `/api/random` | A random entry from a random table: `{category, sub, text}`. Optional `?category=` |
 | `/api/r/<category>?arg=<table>` | A random entry from one table |

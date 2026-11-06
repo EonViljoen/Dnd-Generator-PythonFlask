@@ -1,4 +1,5 @@
 import os
+import platform
 
 from flask import jsonify, request, abort
 from flask_restful import Resource
@@ -26,6 +27,7 @@ class Health(Resource):
             'status': 'ok',
             **JsonReader.Stats(),
             'commit': commit[:7] if commit else None,
+            'python': platform.python_version(),
         })
 
 

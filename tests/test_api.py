@@ -25,6 +25,7 @@ def test_health(client, data):
     assert body['categories'] == len(data)
     assert body['tables'] == sum(len(subs) for subs in data.values())
     assert body['prompts'] == sum(len(entries) for subs in data.values() for entries in subs.values())
+    assert body['python'].count('.') == 2  # e.g. "3.12.4": shows which Python the server runs
 
 
 def test_health_reports_render_commit(client, monkeypatch):
