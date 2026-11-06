@@ -1,7 +1,7 @@
 {
   "name": "D&D Prompt Helper",
   "short_name": "Prompt Helper",
-  "description": "Random prompts for dungeon masters: encounters, NPCs, items, quests, towns, dice and initiative.",
+  "description": "Random prompts for dungeon masters: encounters, NPCs, items, quests, towns, dice, initiative and your party.",
   "id": "/cards",
   "start_url": "/cards",
   "scope": "/",
@@ -18,6 +18,7 @@
   "shortcuts": [
     { "name": "Dice", "url": "/cards#dice", "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }] },
     { "name": "Initiative", "url": "/cards#initiative", "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Party", "url": "/cards#party", "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }] },
     { "name": "Quick builds", "url": "/cards#quick-builds", "icons": [{ "src": "/images/icon-192.png", "sizes": "192x192" }] }
   ]
 }

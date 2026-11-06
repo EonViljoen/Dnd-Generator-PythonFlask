@@ -16,7 +16,8 @@ const build = { id: 'u-1', title: 'Shop', icon: 'shop', parts: [{ label: 'Name',
 const roll = { id: 'r-1', name: 'Fireball', notation: '8d6', mode: 'normal' };
 const combatant = { id: 'c-1', name: 'Goblin', kind: 'npc', mod: 2, init: 14, maxHp: 7, hp: 3, ac: 15, conditions: ['Prone'] };
 const state = {
-    custom: record, builds: [build], rolls: [roll],
+    custom: record, builds: [build], rolls: [roll], characters: [{ id: 'p-1', name: 'Aria', level: 3, maxHp: 24, hp: 20 }],
+    parties: [{ id: 'g-1', name: 'Tuesday', members: [{ id: 'p-1', active: false }, { id: 'p-gone', active: true }] }],
     initiative: { combatants: [combatant], round: 2, activeId: 'c-1' },
     history: [{ category: 'Town', sub: 'Rumors', text: 'A new rumor' }],
     settings: { theme: { preset: 'forest' }, pins: [], hidden: ['Town|Rumors'], dice: { count: 2 }, rollCount: 3, noRepeat: true },
@@ -31,13 +32,16 @@ test('a backup holds everything and restores it', () => {
     assert.equal(backup.exportedAt, NOW.toISOString());
     const { parts, exportedAt } = roundTrip(state);
     assert.equal(exportedAt, NOW.toISOString());
-    assert.deepEqual(Object.keys(parts), ['tables', 'builds', 'rolls', 'initiative', 'settings', 'history']);
+    assert.deepEqual(Object.keys(parts), ['tables', 'builds', 'rolls', 'characters', 'initiative', 'settings', 'history']);
     assert.deepEqual(parts.tables.value.data, record.data);
     assert.equal(parts.tables.value.tables, 2);
     assert.equal(parts.tables.value.prompts, 3);
     assert.equal(parts.tables.detail, '2 tables, 3 prompts (1 personal copy)');
     assert.equal(parts.builds.value[0].title, 'Shop');
     assert.equal(parts.rolls.value[0].notation, '8d6');
+    assert.equal(parts.characters.value.characters[0].hp, 20);
+    assert.deepEqual(parts.characters.value.parties[0].members, [{ id: 'p-1', active: false }], 'members that no longer exist are dropped');
+    assert.equal(parts.characters.detail, '1 character, 1 party: Aria');
     assert.equal(parts.initiative.value.combatants[0].hp, 3);
     assert.equal(parts.initiative.detail, '1 combatant · round 2');
     assert.equal(parts.settings.value.rollCount, 3);

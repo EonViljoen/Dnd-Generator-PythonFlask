@@ -8,6 +8,7 @@
 // to the server.
 
 import { parse as parseDice } from './dice.js';
+import { normalizeParty, normalizeParties } from './party.js';
 
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -172,6 +173,24 @@ export const savedRolls = {
         try { await navigator.storage?.persist?.(); } catch { /* ignore */ }
     },
 };
+
+// ---------- Characters and parties ----------
+// Characters (see party.js) and the named parties that group them, each stored as one array.
+const CHARACTERS_KEY = 'characters';
+const PARTIES_KEY = 'parties';
+
+const listStore = (key, normalize) => ({
+    async load() {
+        try { return normalize(await storage.get(key)); }
+        catch { return []; }
+    },
+    async save(list) {
+        await storage.set(key, list);
+        try { await navigator.storage?.persist?.(); } catch { /* ignore */ }
+    },
+});
+export const characterData = listStore(CHARACTERS_KEY, normalizeParty);
+export const partiesData = listStore(PARTIES_KEY, (raw) => normalizeParties(raw));
 
 export const newRollId = () => 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 

@@ -48,6 +48,8 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | ⚡ **Quick builds** | Roll several tables at once: a Quick NPC, Tavern, Town, Villain or Side Quest. Reroll any single line you don't like. |
 | 🛠️ **Your own builds** | Create Quick builds from any tables: name each line, pick an icon, reorder lines, or copy a built-in build as a starting point. |
 | 🎯 **Dice roller** | d4 to d100 with a count, modifier and advantage/disadvantage, or type any notation (`2d6+3`, `4d6kh3`, `1d20+1d4`). Save named rolls like *Longsword attack* to reuse in one click. Dice written inside prompts ("lasts *1d4* hours", "*2d4×100* gp") are clickable too. Shows every die, highlights natural 20s and 1s, and uses fair cryptographic randomness. |
+| 🧝 **Characters** | Keep each player's character on a simple sheet: race, class, level, HP, AC, speed, ability scores (modifiers, proficiency, initiative and passive Perception worked out for you), armor, weapons, inventory, coins and notes. Quick damage/heal and a Level up button on every card. |
+| 🛡️ **Parties** | Group characters into named parties, one per campaign or table. Switch off anyone who isn't playing this session, see the party at a glance, and level everyone up at once. |
 | ⚔️ **Initiative tracker** | Add your party and monsters (numbered automatically, initiative rolled for you), then step through turns and rounds. Track HP with quick damage/heal, AC and conditions. Defeated monsters are skipped, and it all survives a refresh. |
 | 🔁 **Roll several, no repeats** | Roll ×2, ×3 or ×5 different prompts at once, each with its own reroll. Turn on *Don't repeat prompts* and every table hands out each entry once before reshuffling; tiles show how many are left. |
 | 🔀 **Surprise me** | Roll on a random table, or on any table within the current category. |
@@ -60,7 +62,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | 🎨 **Themes** | Five presets (Tavern, Arcane, Forest, Frost and the light Parchment), or build your own from 7 colours with a live preview and a readability check. Saved in your browser and applied before the page draws. |
 | 🔒 **Private by design** | Custom tables, builds, pins and history stay in your browser. Nothing is uploaded and there are no accounts. |
 | 📱 **Works anywhere** | Responsive layout: sidebar on desktop, scrolling category chips and a bottom result sheet on phones. |
-| 💾 **Backup file** | Download everything you've set up (your tables and edits, Quick builds, saved rolls, initiative tracker, theme and settings) as one file, then restore it on another device, choosing which parts to bring over. No accounts: it stays yours. |
+| 💾 **Backup file** | Download everything you've set up (your tables and edits, Quick builds, saved rolls, characters and parties, initiative tracker, theme and settings) as one file, then restore it on another device, choosing which parts to bring over. No accounts: it stays yours. |
 | 📲 **Offline & installable** | Install it as an app (its own window, home-screen icon). Optionally save the built-in tables (about 2 MB, only after you agree) so everything works without internet and opens instantly, even while Render's server is waking up. Saved tables update themselves when the prompts change. |
 
 ### Keyboard shortcuts
@@ -131,7 +133,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 | Tool | Used for |
 |------|----------|
 | Vanilla JavaScript (ES modules) | All UI logic, with no framework or build step (`app.js`, `data.js`) |
-| [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API) | Stores custom JSON tables, custom Quick builds and saved dice rolls in the browser |
+| [IndexedDB](https://developer.mozilla.org/docs/Web/API/IndexedDB_API) | Stores custom JSON tables, custom Quick builds, saved dice rolls, characters and parties in the browser |
 | [localStorage](https://developer.mozilla.org/docs/Web/API/Window/localStorage) | Pins, roll history, hidden tables, dice settings, the initiative tracker, your theme, and roll options (×N, seen entries for no repeats) |
 | [Web Crypto](https://developer.mozilla.org/docs/Web/API/Crypto/getRandomValues) | Unbiased dice rolls (`crypto.getRandomValues` with rejection sampling) |
 | [Bootstrap 5.3](https://getbootstrap.com/) | Modals and base styles (self-hosted in `static/vendor`) |
@@ -202,7 +204,7 @@ Every push runs the automated checks on GitHub ([`.github/workflows/checks.yml`]
 | Check | What it covers |
 |-------|----------------|
 | **Python** (3.11 and 3.13) | Clean install and `pip check`; every page and API route, including 404s for bad names; data checks on `rpg_generator.json` (no empty entries, no `?` encoding glitches, no split entries, valid names, Quick builds point at real tables); the app starting under Gunicorn and passing `/api/health` |
-| **JavaScript** | Syntax check of every script; unit tests for the dice engine, initiative tracker and table editing |
+| **JavaScript** | Syntax check of every script; unit tests for the dice engine, initiative tracker, table editing, characters and parties, and backups |
 
 Run them locally:
 
@@ -233,6 +235,7 @@ node --test tests/*.test.mjs
 │   │   ├── data.js       # Data layer: server/local sources, IndexedDB, validation
 │   │   ├── dice.js       # Dice notation parser and fair roller (no DOM, testable in Node)
 │   │   ├── initiative.js # Initiative tracker state: order, turns, HP, conditions (no DOM)
+│   │   ├── party.js      # Characters and parties: sheet rules, levels, HP, groups (no DOM)
 │   │   ├── edits.js      # Table editing and personal copies (no DOM)
 │   │   └── backup.js     # Backup file: make and check it (no DOM)
 │   ├── sw.js             # Service worker: pages and files work offline / during cold starts
@@ -240,7 +243,7 @@ node --test tests/*.test.mjs
 │   ├── vendor/           # Self-hosted Bootstrap, Bootstrap Icons and fonts (with licences)
 │   ├── styles/style.css  # Theme and layout
 │   └── images/           # Favicon (SVG, ICO), Apple touch icon, app icons (192, 512, maskable)
-├── tests/                # pytest (pages, API, data) and Node tests (dice, initiative, editing, backup)
+├── tests/                # pytest (pages, API, data) and Node tests (dice, initiative, editing, party, backup)
 ├── .github/workflows/    # Automated checks on every push
 ├── docs/screenshots/      # README screenshots
 ├── procfile              # Gunicorn start command
@@ -349,6 +352,7 @@ Recommended Render settings (service → **Settings**):
 - [x] Custom JSON tables and show/hide, kept in the browser
 - [x] Dice roller tool
 - [x] Initiative tracker
+- [x] Characters and parties (step 1: the basic sheet)
 - [x] Edit tables directly in the browser (entries, new tables, personal copies)
 - [x] Rename and move tables, create and rename categories
 - [x] Works offline (opt-in) and installs as an app

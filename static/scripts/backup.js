@@ -2,9 +2,10 @@
 // restores themselves on another device. No accounts and nothing sent to the server.
 // Pure functions (no DOM or storage), so they can be tested in Node.
 //
-// File shape: { kind, version, exportedAt, tables?, builds?, rolls?, initiative?, settings?, history? }
+// File shape: { kind, version, exportedAt, tables?, builds?, rolls?, characters?, parties?, initiative?, settings?, history? }
 //   tables:     the custom record (own JSON, personal copies, edits, renames, category icons)
 //   builds:     user Quick builds         rolls:   saved dice rolls
+//   characters: the players' characters   parties: named groups of them (restored together)
 //   initiative: the tracker               history: recent results
 //   settings:   { theme, pins, hidden, dice, rollCount, noRepeat } (localStorage values)
 // The saved offline copy of the built-in tables is left out: it downloads again in one click.
@@ -12,6 +13,7 @@
 import { ValidationError, parseCustomJson, cleanBuild, cleanRoll, ICON_CHOICES, MAX_SAVED_ROLLS } from './data.js';
 import { recount, isEmptyRecord, DEFAULT_RECORD_NAME } from './edits.js';
 import { normalizeState } from './initiative.js';
+import { normalizeParty, normalizeParties } from './party.js';
 
 export const BACKUP_KIND = 'dnd-prompt-helper-backup';
 export const BACKUP_VERSION = 1;
@@ -26,7 +28,7 @@ export const INITIATIVE_KEY = 'dnd.initiative';
 export const HISTORY_KEY = 'dnd.history';
 
 // The parts a user can choose to restore, in the order they're shown
-export const PARTS = ['tables', 'builds', 'rolls', 'initiative', 'settings', 'history'];
+export const PARTS = ['tables', 'builds', 'rolls', 'characters', 'initiative', 'settings', 'history'];
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const ICONS = new Set(ICON_CHOICES);
@@ -43,6 +45,10 @@ export function makeBackup(state, now = new Date()) {
     if (state.custom && !isEmptyRecord(state.custom)) out.tables = state.custom;
     if (state.builds?.length) out.builds = state.builds;
     if (state.rolls?.length) out.rolls = state.rolls;
+    if (state.characters?.length) {
+        out.characters = state.characters;
+        if (state.parties?.length) out.parties = state.parties;
+    }
     if (state.initiative?.combatants?.length) out.initiative = state.initiative;
     if (state.history?.length) out.history = state.history;
     const settings = {};
@@ -114,6 +120,16 @@ export function parseBackup(text) {
     if (builds.length) parts.builds = { value: builds, title: 'Quick builds', detail: plural(builds.length, 'build') };
     const rolls = Array.isArray(raw.rolls) ? raw.rolls.map(cleanRoll).filter(Boolean).slice(0, MAX_SAVED_ROLLS) : [];
     if (rolls.length) parts.rolls = { value: rolls, title: 'Saved dice rolls', detail: plural(rolls.length, 'roll') };
+    const characters = normalizeParty(raw.characters);
+    if (characters.length) {
+        const parties = normalizeParties(raw.parties, characters.map((c) => c.id));
+        parts.characters = {
+            value: { characters, parties },
+            title: 'Characters and parties',
+            detail: plural(characters.length, 'character') + (parties.length ? ', ' + plural(parties.length, 'party', 'parties') : '')
+                + ': ' + characters.slice(0, 6).map((c) => c.name).join(', ') + (characters.length > 6 ? '…' : ''),
+        };
+    }
     if ('initiative' in raw) {
         const init = normalizeState(raw.initiative);
         if (init.combatants.length) {

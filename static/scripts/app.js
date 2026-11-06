@@ -4,11 +4,12 @@ import {
     ICON_CHOICES, iconFor, userBuilds, newBuildId,
     savedRolls, newRollId, MAX_ROLL_NAME, MAX_SAVED_ROLLS,
     encodeShare, decodeShare, cleanBuild, cleanRoll, MAX_SHARE_LENGTH,
-    offlineData, setBaseData, fetchJson,
+    offlineData, setBaseData, fetchJson, characterData, partiesData,
     DEFAULT_BUILD_ICON, MAX_BUILD_LINES, MIN_BUILD_LINES, MAX_TITLE_LENGTH,
 } from './data.js';
 import * as Dice from './dice.js';
 import * as Init from './initiative.js';
+import * as Party from './party.js';
 import * as Edits from './edits.js';
 import * as Backup from './backup.js';
 
@@ -25,6 +26,8 @@ import * as Backup from './backup.js';
     const DICE_KEY = 'dnd.dice';
     const INIT_HASH = 'initiative';
     const INIT_KEY = 'dnd.initiative';
+    const CHAR_HASH = 'characters';
+    const PARTY_HASH = 'party';
 
 
     const $ = (id) => document.getElementById(id);
@@ -64,6 +67,8 @@ import * as Backup from './backup.js';
     let structure = [];       // visible tables only (hidden ones removed)
     let serverRecipes = [];   // built-in quick builds from the server
     let builds = [];          // the user's own quick builds (IndexedDB)
+    let characters = [];      // the players' characters (IndexedDB, see party.js)
+    let parties = [];         // named groups of characters (IndexedDB)
     let recipes = [];         // built-in + own builds
     let combos = [];          // recipes limited to parts whose tables are available
     let view = null;          // { type: 'category', name } | { type: 'combos' } | { type: 'search', q }
@@ -190,6 +195,24 @@ import * as Backup from './backup.js';
                 onclick: goToInitiative,
                 extraClass: 'cat-btn-tool',
             }));
+            items.push(navButton({
+                iconName: 'person-vcard',
+                label: 'Characters',
+                count: characters.length || undefined,
+                title: 'Your players’ characters: level, HP, AC, scores and gear',
+                current: view && view.type === 'characters',
+                onclick: goToCharacters,
+                extraClass: 'cat-btn-tool',
+            }));
+            items.push(navButton({
+                iconName: 'people',
+                label: 'Party',
+                count: parties.length || undefined,
+                title: 'Group characters into parties and track them during a session',
+                current: view && view.type === 'party',
+                onclick: goToParty,
+                extraClass: 'cat-btn-tool',
+            }));
         }
         fill(els.nav, ...items);
         const currentBtn = els.nav.querySelector('[aria-current="true"]');
@@ -217,6 +240,18 @@ import * as Backup from './backup.js';
         setView({ type: 'initiative' });
     }
 
+    function goToCharacters() {
+        if (els.search.value) els.search.value = '';
+        if (location.hash !== '#' + CHAR_HASH) history_replace('#' + CHAR_HASH);
+        setView({ type: 'characters' });
+    }
+
+    function goToParty() {
+        if (els.search.value) els.search.value = '';
+        if (location.hash !== '#' + PARTY_HASH) history_replace('#' + PARTY_HASH);
+        setView({ type: 'party' });
+    }
+
     function goToDice() {
         if (els.search.value) els.search.value = '';
         if (location.hash !== '#' + DICE_HASH) history_replace('#' + DICE_HASH);
@@ -229,6 +264,8 @@ import * as Backup from './backup.js';
         if (name === QUICK_HASH) return { type: 'combos' };
         if (name === DICE_HASH) return { type: 'dice' };
         if (name === INIT_HASH) return { type: 'initiative' };
+        if (name === CHAR_HASH) return { type: 'characters' };
+        if (name === PARTY_HASH) return { type: 'party' };
         return structure.some((c) => c.name === name) ? { type: 'category', name } : null;
     }
 
@@ -247,6 +284,8 @@ import * as Backup from './backup.js';
             view.type === 'combos' ||
             view.type === 'dice' ||
             view.type === 'initiative' ||
+            view.type === 'characters' ||
+            view.type === 'party' ||
             view.type === 'search');
         if (stillValid) return view;
         if (structure.length) return { type: 'category', name: structure[0].name };
@@ -260,6 +299,8 @@ import * as Backup from './backup.js';
         else if (view.type === 'combos') renderCombos();
         else if (view.type === 'dice') renderDice();
         else if (view.type === 'initiative') renderInitiative();
+        else if (view.type === 'characters') renderCharacters();
+        else if (view.type === 'party') renderParty();
         else if (view.type === 'search') renderSearch(view.q);
         else renderEmpty();
     }
@@ -792,6 +833,451 @@ import * as Backup from './backup.js';
                 onclick: () => initAction(Init.removeCombatant, c.id),
             }, icon('x-lg')));
     }
+
+    // ---------- Characters and parties ----------
+    // Characters: every character with a basic sheet (modal), shown as cards.
+    // Party: named groups of characters, shown as a compact table for the session; each member
+    // can be switched off when they're not playing. All stored in this browser and in backups.
+    const CURRENT_PARTY_KEY = 'dnd.currentParty';
+    let charList = null;    // the list container while the Characters view is shown
+    let partyBody = null;   // the content container while the Party view is shown
+    let partyForm = null;   // 'new' | 'rename' while the inline name form is open
+    let currentPartyId = (() => { try { return localStorage.getItem(CURRENT_PARTY_KEY); } catch { return null; } })();
+
+    const currentParty = () => parties.find((p) => p.id === currentPartyId) || parties[0] || null;
+    function setCurrentParty(id) {
+        currentPartyId = id;
+        try { localStorage.setItem(CURRENT_PARTY_KEY, id || ''); } catch { /* ignore */ }
+    }
+
+    function redrawCharacterViews() {
+        renderCharacterList();
+        renderPartyBody();
+        renderNav();
+    }
+    async function saveCharacters(next) {
+        characters = next;
+        try { await characterData.save(characters); } catch { toast('Could not save in this browser'); }
+        redrawCharacterViews();
+    }
+    async function saveParties(next) {
+        parties = next;
+        try { await partiesData.save(parties); } catch { toast('Could not save in this browser'); }
+        redrawCharacterViews();
+    }
+    const updateCharacter = (c) => saveCharacters(Party.upsert(characters, c));
+
+    function levelUpCharacter(c) {
+        const next = Party.levelUp(c);
+        const profUp = Party.proficiency(next.level) > Party.proficiency(c.level);
+        updateCharacter(next);
+        toast(c.name + ' is now level ' + next.level + (profUp ? ' (proficiency ' + Party.signed(Party.proficiency(next.level)) + ')' : ''));
+    }
+
+    const statBox = (label, value, title) => el('div', { class: 'party-stat', title },
+        el('span', { class: 'party-stat-label', text: label }), el('strong', { text: value }));
+
+    // HP with quick damage / heal (temporary HP goes first)
+    function hpTracker(c) {
+        if (c.maxHp === null) {
+            return el('div', { class: 'init-hp init-hp-none' }, el('span', { class: 'init-muted', text: 'HP not set' }));
+        }
+        const pct = Math.round((c.hp / c.maxHp) * 100);
+        const amount = el('input', { type: 'number', inputmode: 'numeric', min: 1, class: 'init-hp-amount', placeholder: 'Amt', 'aria-label': 'Damage or healing for ' + c.name });
+        const apply = (sign) => {
+            const v = Math.abs(Math.trunc(Number(amount.value)));
+            if (!v) { amount.focus(); return; }
+            updateCharacter(Party.changeHp(c, sign * v));
+        };
+        return el('form', { class: 'init-hp party-hp', onsubmit: (e) => { e.preventDefault(); apply(-1); } },
+            el('div', { class: 'init-hp-top' },
+                el('span', { class: 'init-hp-text' }, 'HP ', el('strong', { text: c.hp }), ' / ' + c.maxHp,
+                    c.tempHp ? el('span', { class: 'party-temp', text: ' +' + c.tempHp + ' temp' }) : null),
+                el('div', { class: 'init-hp-bar', role: 'progressbar', 'aria-label': c.name + ' hit points', 'aria-valuemin': 0, 'aria-valuemax': c.maxHp, 'aria-valuenow': c.hp },
+                    el('span', { class: 'init-hp-fill ' + (pct > 50 ? 'is-high' : pct > 25 ? 'is-mid' : 'is-low'), style: 'width:' + pct + '%' }))),
+            el('div', { class: 'init-hp-edit' },
+                amount,
+                el('button', { type: 'submit', class: 'init-hp-btn is-dmg', title: 'Damage (Enter)', 'aria-label': 'Damage ' + c.name }, icon('dash-lg')),
+                el('button', { type: 'button', class: 'init-hp-btn is-heal', title: 'Heal', 'aria-label': 'Heal ' + c.name, onclick: () => apply(1) }, icon('plus-lg'))));
+    }
+
+    const levelUpButton = (c, small = false) => el('button', {
+        type: 'button', class: small ? 'icon-btn pt-icon' : 'btn-outline-gold btn-sm-gold', disabled: c.level >= Party.LIMITS.maxLevel,
+        title: c.level >= Party.LIMITS.maxLevel ? 'Already level 20' : 'Level up to ' + (c.level + 1),
+        'aria-label': 'Level up ' + c.name,
+        onclick: () => levelUpCharacter(c),
+    }, icon('arrow-up-circle'), small ? null : ' Level up');
+
+    // ----- Characters view -----
+    function renderCharacters() {
+        charList = el('section', { class: 'party-list-wrap', 'aria-label': 'Characters' });
+        els.content.replaceChildren(
+            el('div', { class: 'content-head content-head-split' },
+                el('div', {},
+                    el('div', { class: 'content-kicker', text: 'Tools' }),
+                    el('h1', { class: 'content-title', text: 'Characters' }),
+                    el('p', { class: 'content-blurb', text: 'Your players’ characters: level, HP, AC, ability scores and gear. Group them into parties under Party. Saved in this browser.' })),
+                el('button', { type: 'button', class: 'btn-gold', onclick: () => openSheet(null) }, icon('person-plus'), el('span', { text: 'New character' }))),
+            charList);
+        renderCharacterList();
+    }
+
+    function renderCharacterList() {
+        if (!charList || view?.type !== 'characters') return;
+        if (!characters.length) {
+            fill(charList, el('div', { class: 'empty-state empty-state-lg' },
+                icon('person-vcard'),
+                el('p', { text: 'No characters yet. Add each player’s character to keep their level, HP, AC and gear in one place.' }),
+                el('button', { type: 'button', class: 'btn-outline-gold', onclick: () => openSheet(null) }, icon('person-plus'), ' Add the first character')));
+            return;
+        }
+        fill(charList, el('ul', { class: 'party-grid' }, ...characters.map(renderCharacterCard)));
+    }
+
+    function renderCharacterCard(c) {
+        const inParties = parties.filter((p) => p.members.some((m) => m.id === c.id)).map((p) => p.name);
+        return el('li', { class: 'party-card' + (c.maxHp !== null && c.hp === 0 ? ' is-down' : '') },
+            el('div', { class: 'party-card-head' },
+                el('div', { class: 'party-name-wrap' },
+                    el('h2', { class: 'party-name', text: c.name }),
+                    el('p', { class: 'party-summary', text: Party.summary(c) }),
+                    c.player ? el('p', { class: 'party-player', text: 'Played by ' + c.player }) : null),
+                c.maxHp !== null && c.hp === 0 ? el('span', { class: 'init-down', text: 'Down' }) : null),
+            el('div', { class: 'party-stats' },
+                statBox('AC', c.ac ?? '—', 'Armor Class'),
+                statBox('Init', Party.signed(Party.initiativeBonus(c)), 'Initiative bonus (Dexterity)'),
+                statBox('Perc', Party.passivePerception(c), 'Passive Perception'),
+                statBox('Speed', c.speed + ' ft', 'Speed'),
+                statBox('Prof', Party.signed(Party.proficiency(c.level)), 'Proficiency bonus')),
+            hpTracker(c),
+            inParties.length ? el('p', { class: 'party-in' }, icon('people'), ' ' + inParties.join(', ')) : null,
+            el('div', { class: 'party-actions' },
+                levelUpButton(c),
+                el('button', { type: 'button', class: 'btn-gold btn-sm-gold', onclick: () => openSheet(c.id) }, icon('journal-text'), ' Sheet')));
+    }
+
+    // ----- Party view -----
+    function renderParty() {
+        partyBody = el('div', { class: 'pt-body' });
+        partyForm = null;
+        els.content.replaceChildren(
+            el('div', { class: 'content-head' },
+                el('div', { class: 'content-kicker', text: 'Tools' }),
+                el('h1', { class: 'content-title', text: 'Party' }),
+                el('p', { class: 'content-blurb', text: 'Group characters into parties, one per campaign or table. Switch off anyone who isn’t playing this session; they stay in the party.' })),
+            partyBody);
+        renderPartyBody();
+    }
+
+    function partyNameForm(mode) {
+        const p = currentParty();
+        const input = el('input', { type: 'text', class: 'be-input', maxlength: Party.MAX_PARTY_NAME, placeholder: 'e.g. Tuesday group', autocomplete: 'off', 'aria-label': 'Party name', value: mode === 'rename' ? p.name : '' });
+        const error = el('p', { class: 'dice-error', role: 'alert' });
+        const close = () => { partyForm = null; renderPartyBody(); };
+        const form = el('form', {
+            class: 'pt-name-form', novalidate: true,
+            onsubmit: (e) => {
+                e.preventDefault();
+                try {
+                    if (mode === 'new') {
+                        const made = Party.createParty(parties, input.value);
+                        setCurrentParty(made.party.id);
+                        partyForm = null;
+                        saveParties(made.parties);
+                        toast('Created ' + made.party.name);
+                    } else {
+                        partyForm = null;
+                        saveParties(Party.renameParty(parties, p.id, input.value));
+                    }
+                } catch (err) { error.textContent = err.message; input.focus(); }
+            },
+        },
+            el('div', { class: 'pt-name-row' },
+                input,
+                el('button', { type: 'submit', class: 'btn-gold btn-sm-gold' }, icon('check-lg'), mode === 'new' ? ' Create' : ' Rename'),
+                parties.length ? el('button', { type: 'button', class: 'link-btn', onclick: close }, 'Cancel') : null),
+            error);
+        input.addEventListener('keydown', (e) => { if (e.key === 'Escape' && parties.length) { e.stopPropagation(); close(); } });
+        setTimeout(() => input.focus(), 0);
+        return form;
+    }
+
+    function renderPartyBody() {
+        if (!partyBody || view?.type !== 'party') return;
+        if (!parties.length || partyForm === 'new') {
+            fill(partyBody,
+                !parties.length ? el('p', { class: 'cz-sub', text: 'Start by naming your first party.' }) : null,
+                partyNameForm('new'));
+            return;
+        }
+        const p = currentParty();
+        const picker = el('select', {
+            class: 'be-input pt-select', 'aria-label': 'Party',
+            onchange: (e) => { setCurrentParty(e.currentTarget.value); renderPartyBody(); },
+        }, ...parties.map((x) => el('option', { value: x.id, text: x.name })));
+        picker.value = p.id;
+        const bar = el('div', { class: 'pt-bar' },
+            picker,
+            el('button', { type: 'button', class: 'btn-outline-gold btn-sm-gold', onclick: () => { partyForm = 'new'; renderPartyBody(); } }, icon('plus-lg'), ' New party'),
+            el('button', { type: 'button', class: 'link-btn', onclick: () => { partyForm = 'rename'; renderPartyBody(); } }, 'Rename'),
+            el('button', {
+                type: 'button', class: 'link-btn',
+                onclick: () => {
+                    if (!window.confirm('Delete the party “' + p.name + '”? The characters stay under Characters.')) return;
+                    const rest = Party.deleteParty(parties, p.id);
+                    setCurrentParty(rest[0]?.id || null);
+                    saveParties(rest);
+                    toast('Deleted ' + p.name);
+                },
+            }, 'Delete'));
+
+        const members = Party.roster(p, characters);
+        const active = members.filter((m) => m.active);
+        const away = members.filter((m) => !m.active);
+        const notIn = characters.filter((c) => !p.members.some((m) => m.id === c.id));
+
+        const adder = el('select', {
+            class: 'be-input pt-add-select', 'aria-label': 'Add a character to ' + p.name,
+            onchange: (e) => {
+                const v = e.currentTarget.value;
+                if (v === '__new') { e.currentTarget.value = ''; openSheet(null, p.id); return; }
+                if (v) saveParties(Party.addMember(parties, p.id, v));
+            },
+        }, el('option', { value: '', text: '+ Add a character…' }),
+            ...notIn.map((c) => el('option', { value: c.id, text: c.name + ' · ' + Party.summary(c) })),
+            el('option', { value: '__new', text: 'New character…' }));
+
+        const levelAll = active.length ? el('button', {
+            type: 'button', class: 'btn-outline-gold btn-sm-gold',
+            disabled: active.every((c) => c.level >= Party.LIMITS.maxLevel),
+            title: 'Level up everyone who is playing',
+            onclick: () => {
+                if (!window.confirm('Level up ' + active.map((c) => c.name).join(', ') + '?')) return;
+                let next = characters;
+                for (const c of active) next = Party.upsert(next, Party.levelUp(c));
+                saveCharacters(next);
+                toast('Levelled up ' + plural(active.length, 'character'));
+            },
+        }, icon('arrow-up-circle'), ' Level up the party') : null;
+
+        const avg = active.length ? Math.round(active.reduce((n, c) => n + c.level, 0) / active.length) : 0;
+        fill(partyBody,
+            partyForm === 'rename' ? partyNameForm('rename') : bar,
+            el('div', { class: 'pt-summary' },
+                el('span', { class: 'cz-vis-count', text: members.length
+                    ? active.length + ' playing' + (away.length ? ' · ' + away.length + ' away' : '') + (active.length ? ' · average level ' + avg : '')
+                    : 'No one in this party yet.' }),
+                levelAll),
+            members.length ? el('ul', { class: 'pt-list' }, ...active.map((c) => renderPartyRow(p, c))) : null,
+            away.length ? el('h2', { class: 'section-label pt-away-label', text: 'Not playing this session' }) : null,
+            away.length ? el('ul', { class: 'pt-list is-away' }, ...away.map((c) => renderPartyRow(p, c))) : null,
+            el('div', { class: 'pt-add' }, adder));
+    }
+
+    function renderPartyRow(p, c) {
+        const toggle = el('input', {
+            type: 'checkbox', class: 'pt-toggle', role: 'switch',
+            'aria-label': c.name + ' is playing this session', title: c.active ? 'Playing (switch off if they’re away)' : 'Away (switch on when they play)',
+            onchange: (e) => saveParties(Party.setActive(parties, p.id, c.id, e.currentTarget.checked)),
+        });
+        toggle.checked = c.active;
+        const down = c.maxHp !== null && c.hp === 0;
+        return el('li', { class: 'pt-row' + (c.active ? '' : ' is-away') + (down ? ' is-down' : '') },
+            el('label', { class: 'pt-switch' }, toggle, c.active ? 'Playing' : 'Away'),
+            el('div', { class: 'pt-who' },
+                el('div', { class: 'pt-name-line' },
+                    el('span', { class: 'pt-name', text: c.name }),
+                    down ? el('span', { class: 'init-down', text: 'Down' }) : null),
+                el('span', { class: 'pt-meta', text: [Party.summary(c), c.player].filter(Boolean).join(' · ') })),
+            el('div', { class: 'pt-stats' },
+                statBox('AC', c.ac ?? '—', 'Armor Class'),
+                statBox('Init', Party.signed(Party.initiativeBonus(c)), 'Initiative bonus'),
+                statBox('Perc', Party.passivePerception(c), 'Passive Perception')),
+            c.active ? hpTracker(c) : el('span', { class: 'pt-hp-away' }, c.maxHp === null ? '' : 'HP ' + c.hp + ' / ' + c.maxHp),
+            el('div', { class: 'pt-tools' },
+                levelUpButton(c, true),
+                el('button', { type: 'button', class: 'icon-btn pt-icon', title: 'Open sheet', 'aria-label': 'Open ' + c.name + '’s sheet', onclick: () => openSheet(c.id) }, icon('journal-text')),
+                el('button', {
+                    type: 'button', class: 'icon-btn pt-icon', title: 'Remove from ' + p.name, 'aria-label': 'Remove ' + c.name + ' from ' + p.name,
+                    onclick: () => { saveParties(Party.removeMember(parties, p.id, c.id)); toast(c.name + ' left ' + p.name); },
+                }, icon('x-lg'))));
+    }
+
+    // ----- Character sheet -----
+    const sheet = {
+        modalEl: $('partyModal'), form: $('party-form'), body: $('party-sheet'), title: $('partyModalLabel'),
+        error: $('party-error'), del: $('party-delete'),
+    };
+    const sheetModal = new bootstrap.Modal(sheet.modalEl);
+    let sheetId = null;   // id of the character being edited, or null for a new one
+    let sheetAddTo = null; // party to add a new character to
+
+    function openSheet(id, addToParty = null) {
+        const c = characters.find((x) => x.id === id) || null;
+        if (!c && characters.length >= Party.LIMITS.maxCharacters) { toast('You can have up to ' + Party.LIMITS.maxCharacters + ' characters'); return; }
+        sheetId = c ? c.id : null;
+        sheetAddTo = c ? null : addToParty;
+        sheet.title.textContent = c ? c.name : 'New character';
+        sheet.del.hidden = !c;
+        sheet.error.textContent = '';
+        fill(sheet.body, ...renderSheet(c || Party.createCharacter({ name: '?' })));
+        if (!c) sheet.form.elements.name.value = '';
+        updateDerived();
+        sheetModal.show();
+    }
+    sheet.modalEl.addEventListener('shown.bs.modal', () => { if (!sheetId) sheet.form.elements.name.focus(); });
+
+    function renderSheet(c) {
+        const field = (label, input, cls = '') => el('label', { class: ('be-field ' + cls).trim() }, el('span', { text: label }), input);
+        const textIn = (name, value, attrs = {}) => el('input', { type: 'text', class: 'be-input', name, value, maxlength: Party.LIMITS.maxText, autocomplete: 'off', ...attrs });
+        const numIn = (name, value, attrs = {}) => el('input', { type: 'number', inputmode: 'numeric', class: 'be-input', name, value: value ?? '', ...attrs });
+        const section = (iconName, title, ...children) => el('section', { class: 'ps-section' },
+            el('h6', { class: 'cz-heading' }, icon(iconName), ' ' + title), ...children);
+        const datalist = (id, options) => el('datalist', { id }, ...options.map((o) => el('option', { value: o })));
+        const alignment = el('select', { class: 'be-input', name: 'alignment' },
+            el('option', { value: '', text: '—' }),
+            ...[...new Set([...Party.ALIGNMENTS, c.alignment].filter(Boolean))].map((a) => el('option', { value: a, text: a })));
+        alignment.value = c.alignment;
+
+        const scores = Party.ABILITIES.map(({ key, label, short }) =>
+            el('label', { class: 'ps-score', title: label },
+                el('span', { class: 'ps-score-label', text: short }),
+                numIn('score-' + key, c.scores[key], { min: 1, max: Party.LIMITS.maxScore, 'aria-label': label }),
+                el('span', { class: 'ps-score-mod', 'data-mod': key })));
+
+        const shield = el('input', { type: 'checkbox', name: 'shield' });
+        shield.checked = c.shield;
+        const percProf = el('input', { type: 'checkbox', name: 'perceptionProf' });
+        percProf.checked = c.perceptionProf;
+        const derived = (key, label) => el('div', { class: 'party-stat' }, el('span', { class: 'party-stat-label', text: label }), el('strong', { 'data-derived': key }));
+
+        return [
+            datalist('ps-classes', Party.CLASSES),
+            datalist('ps-races', Party.RACES),
+            section('person-vcard', 'Character',
+                el('div', { class: 'ps-grid' },
+                    field('Name', textIn('name', c.name, { required: true, placeholder: 'e.g. Aria Stormwind' }), 'ps-wide'),
+                    field('Player', textIn('player', c.player, { placeholder: 'Who plays them' })),
+                    field('Race', textIn('race', c.race, { list: 'ps-races' })),
+                    field('Class', textIn('cls', c.cls, { list: 'ps-classes' })),
+                    field('Subclass', textIn('subclass', c.subclass)),
+                    field('Level', numIn('level', c.level, { min: 1, max: Party.LIMITS.maxLevel })),
+                    field('Background', textIn('background', c.background)),
+                    field('Alignment', alignment))),
+            section('shield-shaded', 'Combat',
+                el('div', { class: 'ps-grid' },
+                    field('Max HP', numIn('maxHp', c.maxHp, { min: 1, max: Party.LIMITS.maxHp, placeholder: '—' })),
+                    field('Current HP', numIn('hp', c.hp, { min: 0, max: Party.LIMITS.maxHp, placeholder: 'Max' })),
+                    field('Temp HP', numIn('tempHp', c.tempHp || '', { min: 0, max: Party.LIMITS.maxHp, placeholder: '0' })),
+                    field('AC', numIn('ac', c.ac, { min: 0, max: Party.LIMITS.maxAc, placeholder: '—' })),
+                    field('Speed (ft)', numIn('speed', c.speed, { min: 0, max: Party.LIMITS.maxSpeed, step: 5 }))),
+                el('div', { class: 'party-stats ps-derived' },
+                    derived('prof', 'Proficiency'), derived('init', 'Initiative'), derived('perc', 'Passive Perception'))),
+            section('bar-chart', 'Ability scores',
+                el('div', { class: 'ps-scores' }, ...scores),
+                el('label', { class: 'ps-check' }, percProf, ' Proficient in Perception')),
+            section('shield', 'Armor and weapons',
+                el('div', { class: 'ps-grid' },
+                    field('Armor', textIn('armor', c.armor, { placeholder: 'e.g. Chain mail' }), 'ps-wide'),
+                    el('label', { class: 'ps-check ps-check-inline' }, shield, ' Shield')),
+                rowEditor('weapons', 'Weapon', [
+                    { key: 'name', label: 'Weapon', placeholder: 'e.g. Longsword', cls: 'ps-row-name' },
+                    { key: 'attack', label: 'Attack', placeholder: '+5', maxlength: 20, cls: 'ps-row-small' },
+                    { key: 'damage', label: 'Damage', placeholder: '1d8+3 slashing' },
+                ], c.weapons, Party.LIMITS.maxWeapons)),
+            section('backpack', 'Inventory',
+                rowEditor('inventory', 'Item', [
+                    { key: 'name', label: 'Item', placeholder: 'e.g. Rope (50 ft)', cls: 'ps-row-name' },
+                    { key: 'qty', label: 'Qty', type: 'number', placeholder: '1', cls: 'ps-row-small' },
+                    { key: 'notes', label: 'Notes', placeholder: 'Optional', maxlength: 200 },
+                ], c.inventory, Party.LIMITS.maxItems),
+                el('div', { class: 'ps-coins' }, ...Party.COINS.map((k) =>
+                    field(k.toUpperCase(), numIn('coin-' + k, c.coins[k] || '', { min: 0, max: Party.LIMITS.maxCoins, placeholder: '0' }))))),
+            section('journal-text', 'Notes',
+                el('textarea', { class: 'be-input ps-notes', name: 'notes', rows: 4, maxlength: Party.LIMITS.maxNotes, placeholder: 'Backstory, bonds, features, anything worth remembering' }, c.notes)),
+        ];
+    }
+
+    // Editable list of rows (weapons, inventory). Rows are read back by data-row / data-key.
+    function rowEditor(kind, noun, columns, items, max) {
+        const list = el('ul', { class: 'ps-rows', 'data-rows': kind });
+        const addBtn = el('button', { type: 'button', class: 'link-btn ps-add' }, icon('plus-lg'), ' Add ' + noun.toLowerCase());
+        const head = el('div', { class: 'ps-row ps-rows-head', 'aria-hidden': 'true' },
+            ...columns.map((col) => el('span', { class: col.cls || '', text: col.label })), el('span'));
+        const sync = () => { addBtn.hidden = list.children.length >= max; head.hidden = !list.children.length; };
+        const addRow = (item = {}, focus = false) => {
+            const inputs = columns.map((col) => el('input', {
+                type: col.type || 'text', class: 'be-input ' + (col.cls || ''), 'data-key': col.key,
+                value: item[col.key] ?? '', placeholder: col.placeholder, 'aria-label': col.label,
+                maxlength: col.type === 'number' ? null : (col.maxlength || Party.LIMITS.maxText),
+                min: col.type === 'number' ? 0 : null, inputmode: col.type === 'number' ? 'numeric' : null,
+            }));
+            const row = el('li', { class: 'ps-row', 'data-row': kind }, ...inputs,
+                el('button', {
+                    type: 'button', class: 'icon-btn', title: 'Remove', 'aria-label': 'Remove ' + noun.toLowerCase(),
+                    onclick: () => { row.remove(); sync(); },
+                }, icon('x-lg')));
+            list.append(row);
+            sync();
+            if (focus) inputs[0].focus();
+        };
+        for (const item of items) addRow(item);
+        addBtn.addEventListener('click', () => addRow({}, true));
+        sync();
+        return el('div', { class: 'ps-rows-wrap' }, head, list, addBtn);
+    }
+
+    function readSheet() {
+        const f = sheet.form.elements;
+        const v = (name) => f[name]?.value ?? '';
+        const rows = (kind) => [...sheet.body.querySelectorAll('[data-row="' + kind + '"]')].map((row) =>
+            Object.fromEntries([...row.querySelectorAll('[data-key]')].map((i) => [i.dataset.key, i.value])));
+        const existing = characters.find((x) => x.id === sheetId);
+        return {
+            id: sheetId || undefined, createdAt: existing?.createdAt,
+            name: v('name'), player: v('player'), race: v('race'), cls: v('cls'), subclass: v('subclass'),
+            level: v('level'), background: v('background'), alignment: v('alignment'),
+            maxHp: v('maxHp'), hp: v('hp') === '' ? v('maxHp') : v('hp'), tempHp: v('tempHp'), ac: v('ac'), speed: v('speed'),
+            scores: Object.fromEntries(Party.ABILITIES.map(({ key }) => [key, v('score-' + key)])),
+            perceptionProf: f.perceptionProf.checked, armor: v('armor'), shield: f.shield.checked,
+            weapons: rows('weapons'), inventory: rows('inventory'),
+            coins: Object.fromEntries(Party.COINS.map((k) => [k, v('coin-' + k)])),
+            notes: v('notes'),
+        };
+    }
+
+    // Modifiers, proficiency, initiative and passive Perception follow what's typed
+    function updateDerived() {
+        const c = Party.normalizeCharacter({ ...readSheet(), name: 'x' });
+        for (const node of sheet.body.querySelectorAll('[data-mod]')) node.textContent = Party.signed(Party.modifier(c.scores[node.dataset.mod]));
+        const set = (key, value) => { const n = sheet.body.querySelector('[data-derived="' + key + '"]'); if (n) n.textContent = value; };
+        set('prof', Party.signed(Party.proficiency(c.level)));
+        set('init', Party.signed(Party.initiativeBonus(c)));
+        set('perc', Party.passivePerception(c));
+    }
+    sheet.form.addEventListener('input', updateDerived);
+
+    sheet.form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        sheet.error.textContent = '';
+        const raw = readSheet();
+        if (!raw.name.trim()) { sheet.error.textContent = 'Give the character a name.'; sheet.form.elements.name.focus(); return; }
+        const c = Party.createCharacter(raw);
+        const addTo = parties.find((x) => x.id === sheetAddTo);
+        saveCharacters(Party.upsert(characters, c));
+        if (addTo) saveParties(Party.addMember(parties, addTo.id, c.id));
+        sheetModal.hide();
+        toast(sheetId ? 'Saved ' + c.name : 'Added ' + c.name + (addTo ? ' to ' + addTo.name : ''));
+    });
+
+    sheet.del.addEventListener('click', () => {
+        const c = characters.find((x) => x.id === sheetId);
+        if (!c || !window.confirm('Delete ' + c.name + '? Their sheet is removed and they leave every party.')) return;
+        saveCharacters(Party.remove(characters, c.id));
+        if (parties.some((p) => p.members.some((m) => m.id === c.id))) saveParties(Party.removeCharacterEverywhere(parties, c.id));
+        sheetModal.hide();
+        toast('Removed ' + c.name);
+    });
 
     // ---------- Dice ----------
     const DICE_EXAMPLES = [
@@ -2191,6 +2677,8 @@ import * as Backup from './backup.js';
         else if (next.type === 'combos') history_replace('#' + QUICK_HASH);
         else if (next.type === 'dice') history_replace('#' + DICE_HASH);
         else if (next.type === 'initiative') history_replace('#' + INIT_HASH);
+        else if (next.type === 'characters') history_replace('#' + CHAR_HASH);
+        else if (next.type === 'party') history_replace('#' + PARTY_HASH);
         setView(next);
     }
 
@@ -3068,6 +3556,7 @@ import * as Backup from './backup.js';
         if (custom && !Edits.isEmptyRecord(custom)) bits.push(plural(custom.tables, 'table') + ' of your own');
         if (builds.length) bits.push(plural(builds.length, 'Quick build'));
         if (rollList.length) bits.push(plural(rollList.length, 'saved roll'));
+        if (characters.length) bits.push(plural(characters.length, 'character'));
         if (initState.combatants.length) bits.push('the initiative tracker');
         if (pins.length) bits.push(plural(pins.length, 'pin'));
         bk.contents.textContent = bits.length
@@ -3083,6 +3572,8 @@ import * as Backup from './backup.js';
             custom: await customData.load(),
             builds: await userBuilds.load(),
             rolls: await savedRolls.load(),
+            characters: await characterData.load(),
+            parties: await partiesData.load(),
             initiative: readLocal(Backup.INITIATIVE_KEY),
             history: readLocal(Backup.HISTORY_KEY),
             settings,
@@ -3143,6 +3634,9 @@ import * as Backup from './backup.js';
                     await userBuilds.save(value);
                 } else if (name === 'rolls') {
                     await savedRolls.save(value);
+                } else if (name === 'characters') {
+                    await characterData.save(value.characters);
+                    await partiesData.save(value.parties);
                 } else if (name === 'initiative') {
                     setLocal(Backup.INITIATIVE_KEY, value);
                 } else if (name === 'history') {
@@ -3239,6 +3733,8 @@ import * as Backup from './backup.js';
             setTimeout(() => (fromSaved ? checkForUpdates() : maybeOfferOffline()), 1200);
             builds = await userBuilds.load();
             rollList = await savedRolls.load();
+            characters = await characterData.load();
+            parties = Party.normalizeParties(await partiesData.load(), characters.map((c) => c.id));
             try {
                 await loadSource();
             } catch (err) {
@@ -3273,6 +3769,8 @@ import * as Backup from './backup.js';
         if (next.type === 'combos') goToCombos();
         else if (next.type === 'dice') goToDice();
         else if (next.type === 'initiative') goToInitiative();
+        else if (next.type === 'characters') goToCharacters();
+        else if (next.type === 'party') goToParty();
         else goToCategory(next.name);
     });
 }
