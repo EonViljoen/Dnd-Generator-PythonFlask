@@ -27,6 +27,17 @@ def test_entries_are_non_empty_text(data):
     assert not bad, f'empty or non-text entries: {bad[:10]}'
 
 
+def test_entries_have_no_stray_spaces(data):
+    bad = [where for where, e in all_entries(data) if e != e.strip()]
+    assert not bad, f'entries with leading or trailing spaces: {bad[:10]}'
+
+
+def test_no_duplicate_entries(data):
+    bad = [f'{category} › {table}: {e[:60]}' for category, subs in data.items() for table, entries in subs.items()
+           for i, e in enumerate(entries) if e in entries[:i]]
+    assert not bad, 'entries listed twice in the same table:\n' + '\n'.join(bad[:10])
+
+
 def test_entries_within_editor_limit(data):
     long = [where for where, e in all_entries(data) if len(e) > MAX_ENTRY_LENGTH]
     assert not long, f'entries longer than {MAX_ENTRY_LENGTH} characters: {long[:10]}'
