@@ -1,11 +1,12 @@
 from flask import Blueprint
 from flask_restful import Api
-from routes import GetAll, Structure, Search, RandomAny, Combos, ComboRoll, RandomCategoryEntry, CategorySpecific, CategoryHeadings, CategorySubHeadings, EntryCount
+from routes import Health, GetAll, Structure, Search, RandomAny, Combos, ComboRoll, RandomCategoryEntry, CategorySpecific, CategoryHeadings, CategorySubHeadings, EntryCount
 
 
 api_blueprint = Blueprint('api', __name__)
 api = Api(api_blueprint)
 
+api.add_resource(Health, '/health')
 api.add_resource(GetAll, '/getall')
 api.add_resource(Structure, '/structure')
 api.add_resource(Search, '/search')

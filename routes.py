@@ -1,3 +1,5 @@
+import os
+
 from flask import jsonify, request, abort
 from flask_restful import Resource
 from jsonReader import JsonReader
@@ -14,6 +16,17 @@ def _lookup(fn, *args):
 class GetAll(Resource):
     def get(self):
         return jsonify(JsonReader.ReadFrom())
+
+
+class Health(Resource):
+    """Cheap liveness check for Render and uptime monitors."""
+    def get(self):
+        commit = os.environ.get('RENDER_GIT_COMMIT') or None
+        return jsonify({
+            'status': 'ok',
+            **JsonReader.Stats(),
+            'commit': commit[:7] if commit else None,
+        })
 
 
 class Structure(Resource):

@@ -1,0 +1,52 @@
+# Runs on every push and pull request. Render can be set to deploy only when this passes.
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }} (app, API, data)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Check for broken or conflicting dependencies
+        run: pip check
+      - name: Pages, API and data tests
+        run: pytest -q
+      - name: App starts under gunicorn and is healthy
+        run: |
+          gunicorn --bind 127.0.0.1:8000 main:app &
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8000/api/health && exit 0; sleep 1; done
+          echo "gunicorn did not become healthy" && exit 1
+
+  javascript:
+    name: JavaScript (syntax and tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: |
+          # ES modules (import/export) and classic scripts are checked differently
+          for f in static/scripts/app.js static/scripts/data.js static/scripts/dice.js static/scripts/initiative.js static/scripts/edits.js; do
+            node --input-type=module --check < "$f" || { echo "Syntax error in $f"; exit 1; }
+          done
+          node --check static/scripts/theme.js
+          node --check static/sw.js
+      - name: Unit tests (dice, initiative, table editing)
+        run: node --test tests/*.test.mjs

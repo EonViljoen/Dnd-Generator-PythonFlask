@@ -14,6 +14,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES%20modules-F7DF1E?logo=javascript&logoColor=black)
 ![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-7952B3?logo=bootstrap&logoColor=white)
 ![Render](https://img.shields.io/badge/Hosted%20on-Render-46E3B7?logo=render&logoColor=white)
+[![Checks](https://github.com/EonViljoen/Dnd-Generator-PythonFlask/actions/workflows/checks.yml/badge.svg)](https://github.com/EonViljoen/Dnd-Generator-PythonFlask/actions/workflows/checks.yml)
 
 <br><br>
 
@@ -29,6 +30,7 @@ Random prompts for dungeon masters: encounters, NPCs, items, quests, towns and m
 - [Screenshots](#screenshots)
 - [Tech stack and tools](#tech-stack-and-tools)
 - [Getting started](#getting-started)
+- [Tests](#tests)
 - [Project structure](#project-structure)
 - [The prompt data](#the-prompt-data)
 - [Your own tables and builds](#your-own-tables-and-builds)
@@ -190,9 +192,20 @@ Then open <http://localhost:5001>. The generator is at `/cards`.
 
 Run `deactivate` to leave the virtual environment.
 
-**Tests:** the dice engine, initiative tracker and table editing have unit tests that run with Node's built-in test runner (Node 18+):
+## Tests
+
+Every push runs the automated checks on GitHub ([`.github/workflows/checks.yml`](.github/workflows/checks.yml)):
+
+| Check | What it covers |
+|-------|----------------|
+| **Python** (3.9 and 3.12) | Clean install and `pip check`; every page and API route, including 404s for bad names; data checks on `rpg_generator.json` (no empty entries, no `?` encoding glitches, no split entries, valid names, Quick builds point at real tables); the app starting under Gunicorn and passing `/api/health` |
+| **JavaScript** | Syntax check of every script; unit tests for the dice engine, initiative tracker and table editing |
+
+Run them locally:
 
 ```bash
+pip install -r requirements-dev.txt
+pytest
 node --test tests/*.test.mjs
 ```
 
@@ -221,7 +234,8 @@ node --test tests/*.test.mjs
 │   ├── sw.js             # Service worker: instant pages during Render cold starts
 │   ├── styles/style.css  # Theme and layout
 │   └── images/           # Favicon (SVG, ICO) and Apple touch icon
-├── tests/                # Node tests: dice engine, initiative tracker, table editing
+├── tests/                # pytest (pages, API, data) and Node tests (dice, initiative, editing)
+├── .github/workflows/    # Automated checks on every push
 ├── docs/screenshots/      # README screenshots
 ├── procfile              # Gunicorn start command
 └── .render.yaml          # Render service config
@@ -294,6 +308,7 @@ All endpoints are `GET` and return JSON.
 
 | Endpoint | Returns |
 |----------|---------|
+| `/api/health` | `{status: "ok", categories, tables, prompts, commit}`, a quick check for monitors and Render (`commit` is the deployed Git commit on Render) |
 | `/api/structure` | Categories with icon, blurb, totals and tables (no entry text) |
 | `/api/random` | A random entry from a random table: `{category, sub, text}`. Optional `?category=` |
 | `/api/r/<category>?arg=<table>` | A random entry from one table |
@@ -312,6 +327,10 @@ The app is deployed on [Render](https://render.com/) and redeploys automatically
 
 - **Build:** `pip install -r requirements.txt`
 - **Start:** `gunicorn main:app` (see [`procfile`](procfile) and [`.render.yaml`](.render.yaml))
+
+Recommended Render settings (service → **Settings**):
+- **Auto-Deploy: After CI Checks Pass**, so a push that fails the checks never goes live and the last good version keeps running.
+- **Health Checks → path `/api/health`**, so Render only switches traffic to a new deploy once it answers, and restarts an instance that stops responding.
 
 **Cold starts:** Render's free tier puts the server to sleep when idle, and waking it can take up to a minute. A service worker ([`static/sw.js`](static/sw.js)) keeps a copy of the pages, so returning visitors get the page straight away and see a *"Waking up the tavern…"* screen that retries until the API answers, then carries on by itself. A visitor's very first visit still waits for the server.
 
