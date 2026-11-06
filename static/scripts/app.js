@@ -791,8 +791,7 @@ import * as Backup from './backup.js';
             const pct = Math.round((c.hp / c.maxHp) * 100);
             const amount = el('input', { type: 'number', inputmode: 'numeric', min: 1, class: 'init-hp-amount', placeholder: 'Amt', 'aria-label': 'Damage or healing for ' + c.name });
             const apply = (sign) => {
-                const v = Math.abs(Math.trunc(Number(amount.value)));
-                if (!v) { amount.focus(); return; }
+                const v = Math.abs(Math.trunc(Number(amount.value))) || 1;   // empty: 1 HP
                 update((x) => Init.changeHp(x, sign * v));
             };
             hpBlock = el('form', {
@@ -805,8 +804,8 @@ import * as Backup from './backup.js';
                         el('span', { class: 'init-hp-fill ' + (pct > 50 ? 'is-high' : pct > 25 ? 'is-mid' : 'is-low'), style: 'width:' + pct + '%' }))),
                 el('div', { class: 'init-hp-edit' },
                     amount,
-                    el('button', { type: 'submit', class: 'init-hp-btn is-dmg', title: 'Damage (Enter)', 'aria-label': 'Damage ' + c.name }, icon('dash-lg')),
-                    el('button', { type: 'button', class: 'init-hp-btn is-heal', title: 'Heal', 'aria-label': 'Heal ' + c.name, onclick: () => apply(1) }, icon('plus-lg'))));
+                    el('button', { type: 'submit', class: 'init-hp-btn is-dmg', title: 'Damage (Enter). Empty: 1 HP', 'aria-label': 'Damage ' + c.name }, icon('dash-lg')),
+                    el('button', { type: 'button', class: 'init-hp-btn is-heal', title: 'Heal. Empty: 1 HP', 'aria-label': 'Heal ' + c.name, onclick: () => apply(1) }, icon('plus-lg'))));
         }
 
         return el('li', { class: 'init-row is-' + c.kind + (active ? ' is-active' : '') + (down ? ' is-down' : ''), 'aria-current': active ? 'true' : null },
@@ -887,8 +886,7 @@ import * as Backup from './backup.js';
         const pct = Math.round((c.hp / c.maxHp) * 100);
         const amount = el('input', { type: 'number', inputmode: 'numeric', min: 1, class: 'init-hp-amount', placeholder: 'Amt', 'aria-label': 'Damage or healing for ' + c.name });
         const apply = (sign) => {
-            const v = Math.abs(Math.trunc(Number(amount.value)));
-            if (!v) { amount.focus(); return; }
+            const v = Math.abs(Math.trunc(Number(amount.value))) || 1;   // empty: 1 HP
             updateCharacter(Party.changeHp(c, sign * v));
         };
         return el('form', { class: 'init-hp party-hp', onsubmit: (e) => { e.preventDefault(); apply(-1); } },
@@ -899,8 +897,8 @@ import * as Backup from './backup.js';
                     el('span', { class: 'init-hp-fill ' + (pct > 50 ? 'is-high' : pct > 25 ? 'is-mid' : 'is-low'), style: 'width:' + pct + '%' }))),
             el('div', { class: 'init-hp-edit' },
                 amount,
-                el('button', { type: 'submit', class: 'init-hp-btn is-dmg', title: 'Damage (Enter)', 'aria-label': 'Damage ' + c.name }, icon('dash-lg')),
-                el('button', { type: 'button', class: 'init-hp-btn is-heal', title: 'Heal', 'aria-label': 'Heal ' + c.name, onclick: () => apply(1) }, icon('plus-lg'))));
+                el('button', { type: 'submit', class: 'init-hp-btn is-dmg', title: 'Damage (Enter). Empty: 1 HP', 'aria-label': 'Damage ' + c.name }, icon('dash-lg')),
+                el('button', { type: 'button', class: 'init-hp-btn is-heal', title: 'Heal. Empty: 1 HP', 'aria-label': 'Heal ' + c.name, onclick: () => apply(1) }, icon('plus-lg'))));
     }
 
     const levelUpButton = (c, small = false) => el('button', {
